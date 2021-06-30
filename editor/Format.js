@@ -1927,77 +1927,80 @@ StyleFormatPanel.prototype.addEditOps = function(a) {
 };
 StyleFormatPanel.prototype.addFill = function(a) {
     var c = this.editorUi.editor.graph,
-        b = this.format.getSelectionState();
+        d = this.format.getSelectionState();
     a.style.paddingTop = "6px";
     a.style.paddingBottom = "6px";
-    var e = document.createElement("select");
-    e.style.position = "absolute";
-    e.style.marginTop = "-2px";
-    e.style.right = "72px";
-    e.style.width = "70px";
-    var h = e.cloneNode(!1);
-    mxEvent.addListener(e, "click", function(a) {
+    var b = document.createElement("select");
+    b.style.position = "absolute";
+    b.style.marginTop = "-2px";
+    b.style.right = "72px";
+    b.style.width = "70px";
+    var f = b.cloneNode(!1);
+    mxEvent.addListener(b, "click", function(a) {
         mxEvent.consume(a)
     });
-    mxEvent.addListener(h, "click", function(a) {
+    mxEvent.addListener(f, "click", function(a) {
         mxEvent.consume(a)
     });
-    var d = 1 <= b.vertices.length ? c.stylesheet.getDefaultVertexStyle() :
+    var e = 1 <= d.vertices.length ? c.stylesheet.getDefaultVertexStyle() :
         c.stylesheet.getDefaultEdgeStyle(),
-        g = this.createCellColorOption(mxResources.get("gradient"), mxConstants.STYLE_GRADIENTCOLOR, null != d[mxConstants.STYLE_GRADIENTCOLOR] ? d[mxConstants.STYLE_GRADIENTCOLOR] : "#ffffff", function(a) {
-            e.style.display = null == a || a == mxConstants.NONE ? "none" : ""
+        h = this.createCellColorOption(mxResources.get("gradient"), mxConstants.STYLE_GRADIENTCOLOR, null != e[mxConstants.STYLE_GRADIENTCOLOR] ? e[mxConstants.STYLE_GRADIENTCOLOR] : "#ffffff", function(a) {
+            b.style.display = null == a || a == mxConstants.NONE ? "none" : ""
         }, function(a) {
             c.updateCellStyles(mxConstants.STYLE_GRADIENTCOLOR, a, c.getSelectionCells())
         }),
-        f = "image" == b.style.shape ? mxConstants.STYLE_IMAGE_BACKGROUND : mxConstants.STYLE_FILLCOLOR,
-        l = "image" == b.style.shape ? mxResources.get("background") :
-        mxResources.get("fill");
-    d = 1 <= b.vertices.length ? c.stylesheet.getDefaultVertexStyle() : c.stylesheet.getDefaultEdgeStyle();
-    d = this.createCellColorOption(l, f, null != d[f] ? d[f] : "#ffffff", null, mxUtils.bind(this, function(a) {
-        c.updateCellStyles(f, a, c.getSelectionCells())
-    }));
-    d.style.fontWeight = "bold";
-    l = mxUtils.getValue(b.style, f, null);
-    g.style.display = null != l && l != mxConstants.NONE && b.fill && "image" != b.style.shape ? "" : "none";
-    var n = [mxConstants.DIRECTION_NORTH, mxConstants.DIRECTION_EAST, mxConstants.DIRECTION_SOUTH, mxConstants.DIRECTION_WEST];
-    for (l = 0; l < n.length; l++) {
-        var k = document.createElement("option");
-        k.setAttribute("value", n[l]);
-        mxUtils.write(k, mxResources.get(n[l]));
-        e.appendChild(k)
+        g = "image" == d.style.shape ? mxConstants.STYLE_IMAGE_BACKGROUND : mxConstants.STYLE_FILLCOLOR,
+        k = "image" == d.style.shape ? mxResources.get("background") :
+        mxResources.get("fill"),
+        e = 1 <= d.vertices.length ? c.stylesheet.getDefaultVertexStyle() : c.stylesheet.getDefaultEdgeStyle(),
+        e = this.createCellColorOption(k, g, null != e[g] ? e[g] : "#ffffff", null, mxUtils.bind(this, function(a) {
+            c.updateCellStyles(g, a, d.vertices)
+        }));
+    e.style.fontWeight = "bold";
+    k = mxUtils.getValue(d.style, g, null);
+    h.style.display = null != k && k != mxConstants.NONE && d.fill && "image" != d.style.shape ? "" : "none";
+    for (var l = [mxConstants.DIRECTION_NORTH, mxConstants.DIRECTION_EAST, mxConstants.DIRECTION_SOUTH, mxConstants.DIRECTION_WEST],
+            k = 0; k < l.length; k++) {
+        var m = document.createElement("option");
+        m.setAttribute("value", l[k]);
+        mxUtils.write(m, mxResources.get(l[k]));
+        b.appendChild(m)
     }
-    g.appendChild(e);
-    var m = mxUtils.bind(this, function() {
-        b = this.format.getSelectionState();
-        var c = mxUtils.getValue(b.style, mxConstants.STYLE_GRADIENT_DIRECTION, mxConstants.DIRECTION_SOUTH),
-            d = mxUtils.getValue(b.style, "fillStyle", "auto");
+    h.appendChild(b);
+    for (k = 0; k < Editor.roughFillStyles.length; k++) l = document.createElement("option"), l.setAttribute("value", Editor.roughFillStyles[k].val), mxUtils.write(l, Editor.roughFillStyles[k].dispName), f.appendChild(l);
+    e.appendChild(f);
+    var n = mxUtils.bind(this, function() {
+        d = this.format.getSelectionState();
+        var c = mxUtils.getValue(d.style, mxConstants.STYLE_GRADIENT_DIRECTION,
+                mxConstants.DIRECTION_SOUTH),
+            e = mxUtils.getValue(d.style, "fillStyle", "auto");
         "" == c && (c = mxConstants.DIRECTION_SOUTH);
-        e.value = c;
-        h.value = d;
-        a.style.display = b.fill ? "" : "none";
-        c = mxUtils.getValue(b.style, mxConstants.STYLE_FILLCOLOR,
-            null);
-        !b.fill || b.containsImage || null == c || c == mxConstants.NONE || "filledEdge" == b.style.shape ? (h.style.display = "none", g.style.display = "none") : (h.style.display = "1" == b.style.sketch ? "" : "none", g.style.display = "1" != b.style.sketch || "solid" == d || "auto" == d ? "" : "none")
+        b.value = c;
+        f.value = e;
+        a.style.display = d.fill ? "" : "none";
+        c = mxUtils.getValue(d.style, mxConstants.STYLE_FILLCOLOR, null);
+        !d.fill || d.containsImage || null == c || c == mxConstants.NONE || "filledEdge" == d.style.shape ? (f.style.display = "none", h.style.display = "none") : (f.style.display = "1" == d.style.sketch ? "" : "none", h.style.display = "1" != d.style.sketch || "solid" == e || "auto" == e ? "" : "none")
     });
-    c.getModel().addListener(mxEvent.CHANGE, m);
+    c.getModel().addListener(mxEvent.CHANGE,
+        n);
     this.listeners.push({
         destroy: function() {
-            c.getModel().removeListener(m)
+            c.getModel().removeListener(n)
         }
     });
-    m();
-    mxEvent.addListener(e, "change", function(a) {
-        c.setCellStyles(mxConstants.STYLE_GRADIENT_DIRECTION, e.value, c.getSelectionCells());
+    n();
+    mxEvent.addListener(b, "change", function(a) {
+        c.setCellStyles(mxConstants.STYLE_GRADIENT_DIRECTION, b.value, d.cells);
         mxEvent.consume(a)
     });
-    mxEvent.addListener(h, "change", function(a) {
-        c.setCellStyles("fillStyle", h.value, c.getSelectionCells());
+    mxEvent.addListener(f, "change", function(a) {
+        c.setCellStyles("fillStyle", f.value, d.cells);
         mxEvent.consume(a)
     });
-    a.appendChild(d);
-    a.appendChild(g);
-    d = this.getCustomColors();
-    for (l = 0; l < d.length; l++) a.appendChild(this.createCellColorOption(d[l].title, d[l].key, d[l].defaultValue));
+    a.appendChild(e);
+    a.appendChild(h);
+    e = this.getCustomColors();
+    for (k = 0; k < e.length; k++) a.appendChild(this.createCellColorOption(e[k].title, e[k].key, e[k].defaultValue));
     return a
 };
 StyleFormatPanel.prototype.getCustomColors = function() {
@@ -2457,7 +2460,8 @@ StyleFormatPanel.prototype.addEffects = function(a) {
             b.containsImage ||
                 k(mxResources.get("shadow"), mxConstants.STYLE_SHADOW, 0);
             b.glass && k(mxResources.get("glass"), mxConstants.STYLE_GLASS, 0);
-            b.comic && k(mxResources.get("comic"), "comic", 0)
+            b.comic && k(mxResources.get("comic"), "comic", 0);
+            k(mxResources.get("sketch"), "sketch", 0)
         });
     c.getModel().addListener(mxEvent.CHANGE, m);
     this.listeners.push({

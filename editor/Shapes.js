@@ -7,6 +7,229 @@
  */
  (function()
  {
+     // LATER: Use this to implement striping
+     function paintTableBackground(state, c, x, y, w, h, r)
+     {
+         if (state != null)
+         {
+             var graph = state.view.graph;
+             var start = graph.getActualStartSize(state.cell);
+             var rows = graph.model.getChildCells(state.cell, true);
+             
+             if (rows.length > 0)
+             {
+                 var events = false;
+                 
+                 if (this.style != null)
+                 {
+                     events = mxUtils.getValue(this.style, mxConstants.STYLE_POINTER_EVENTS, '1') == '1';
+                 }
+                 
+                 if (!events)
+                 {
+                     c.pointerEvents = false;
+                 }
+                 
+                 var evenRowColor = mxUtils.getValue(state.style,
+                     'evenRowColor', mxConstants.NONE);
+                 var oddRowColor = mxUtils.getValue(state.style,
+                     'oddRowColor', mxConstants.NONE);
+                 var evenColColor = mxUtils.getValue(state.style,
+                     'evenColumnColor', mxConstants.NONE);
+                 var oddColColor = mxUtils.getValue(state.style,
+                     'oddColumnColor', mxConstants.NONE);
+                 var cols = graph.model.getChildCells(rows[0], true);
+                 
+                 // Paints column backgrounds
+                 for (var i = 0; i < cols.length; i++)
+                 {
+                     var clr = (mxUtils.mod(i, 2) == 1) ? evenColColor : oddColColor;
+                     var geo = graph.getCellGeometry(cols[i]);
+                     
+                     if (geo != null && clr != mxConstants.NONE)
+                     {
+                         c.setFillColor(clr);
+                         c.begin();
+                         c.moveTo(x + geo.x, y + start.y);
+                         
+                         if (r > 0 && i == cols.length - 1)
+                         {
+                             c.lineTo(x + geo.x + geo.width - r, y);
+                             c.quadTo(x + geo.x + geo.width, y, x + geo.x + geo.width, y + r);
+                             c.lineTo(x + geo.x + geo.width, y + h - r);
+                             c.quadTo(x + geo.x + geo.width, y + h, x + geo.x + geo.width - r, y + h);
+                         }
+                         else
+                         {
+                             c.lineTo(x + geo.x + geo.width, y + start.y);
+                             c.lineTo(x + geo.x + geo.width, y + h - start.height);
+                         }
+                         
+                         c.lineTo(x + geo.x, y + h);
+                         c.close();
+                         c.fill();
+                     }
+                 }
+                 
+                 // Paints row backgrounds
+                 for (var i = 0; i < rows.length; i++)
+                 {
+                     var clr = (mxUtils.mod(i, 2) == 1) ? evenRowColor : oddRowColor;
+                     var geo = graph.getCellGeometry(rows[i]);
+     
+                     if (geo != null && clr != mxConstants.NONE)
+                     {
+                         var b = (i == rows.length - 1) ? y + h : y + geo.y + geo.height;
+                         c.setFillColor(clr);
+                         
+                         c.begin();
+                         c.moveTo(x + start.x, y + geo.y);
+                         c.lineTo(x + w - start.width, y + geo.y);
+                         
+                         if (r > 0 && i == rows.length - 1)
+                         {
+                             c.lineTo(x + w, b - r);
+                             c.quadTo(x + w, b, x + w - r, b);
+                             c.lineTo(x + r, b);
+                             c.quadTo(x, b, x, b - r);
+                         }
+                         else
+                         {
+                             c.lineTo(x + w - start.width, b);
+                             c.lineTo(x + start.x, b);
+                         }
+                         
+                         c.close();
+                         c.fill();
+                     }
+                 }
+             }
+         }
+     };
+ 
+     // Table Shape
+     function TableShape()
+     {
+         mxSwimlane.call(this);
+     };
+     
+     mxUtils.extend(TableShape, mxSwimlane);
+ 
+     TableShape.prototype.getLabelBounds = function(rect)
+     {
+         var start = this.getTitleSize();
+         
+         if (start == 0)
+         {
+             return mxShape.prototype.getLabelBounds.apply(this, arguments);
+         }
+         else
+         {
+             return mxSwimlane.prototype.getLabelBounds.apply(this, arguments);
+         }
+     };
+     
+     TableShape.prototype.paintVertexShape = function(c, x, y, w, h)
+     {
+         // LATER: Split background to add striping
+         //paintTableBackground(this.state, c, x, y, w, h);
+         
+         var start = this.getTitleSize();
+         
+         if (start == 0)
+         {
+             mxRectangleShape.prototype.paintBackground.apply(this, arguments);
+         }
+         else
+         {
+             mxSwimlane.prototype.paintVertexShape.apply(this, arguments);
+             c.translate(-x, -y);
+         }
+         
+         this.paintForeground(c, x, y, w, h);
+     };
+ 
+     TableShape.prototype.paintForeground = function(c, x, y, w, h)
+     {
+         if (this.state != null)
+         {
+             var flipH = this.flipH;
+             var flipV = this.flipV;
+             
+             if (this.direction == mxConstants.DIRECTION_NORTH || this.direction == mxConstants.DIRECTION_SOUTH)
+             {
+                 var tmp = flipH;
+                 flipH = flipV;
+                 flipV = tmp;
+             }
+             
+             // Negative transform to avoid save/restore
+             c.rotate(-this.getShapeRotation(), flipH, flipV, x + w / 2, y + h / 2);
+             
+             s = this.scale;
+             x = this.bounds.x / s;
+             y = this.bounds.y / s;
+             w = this.bounds.width / s;
+             h = this.bounds.height / s;
+             this.paintTableForeground(c, x, y, w, h);
+         }
+     };
+     
+     TableShape.prototype.paintTableForeground = function(c, x, y, w, h)
+     {
+         var graph = this.state.view.graph;
+         var start = graph.getActualStartSize(this.state.cell);
+         var rows = graph.model.getChildCells(this.state.cell, true);
+         
+         if (rows.length > 0)
+         {
+             var rowLines = mxUtils.getValue(this.state.style,
+                 'rowLines', '1') != '0';
+             var columnLines = mxUtils.getValue(this.state.style,
+                 'columnLines', '1') != '0';
+             
+             // Paints row lines
+             if (rowLines)
+             {
+                 for (var i = 1; i < rows.length; i++)
+                 {
+                     var geo = graph.getCellGeometry(rows[i]);
+                     
+                     if (geo != null)
+                     {
+                         c.begin();
+                         c.moveTo(x + start.x, y + geo.y);
+                         c.lineTo(x + w - start.width, y + geo.y);
+                         c.end();
+                         c.stroke();
+                     }
+                 }
+             }
+             
+             if (columnLines)
+             {
+                 var cols = graph.model.getChildCells(rows[0], true);
+                 
+                 // Paints column lines
+                 for (var i = 1; i < cols.length; i++)
+                 {
+                     var geo = graph.getCellGeometry(cols[i]);
+                     
+                     if (geo != null)
+                     {
+                         c.begin();
+                         c.moveTo(x + geo.x + start.x, y + start.y);
+                         c.lineTo(x + geo.x + start.x, y + h - start.height);
+                         c.end();
+                         c.stroke();
+                     }
+                 }
+             }
+         }
+     };
+     
+     mxCellRenderer.registerShape('table', TableShape);
+     
      // Cube Shape, supports size style
      function CubeShape()
      {
@@ -92,6 +315,30 @@
      
      var tan30 = Math.tan(mxUtils.toRadians(30));
      var tan30Dx = (0.5 - tan30) / 2;
+ 
+     mxCellRenderer.registerShape('isoRectangle', IsoRectangleShape);
+     
+     // Cube Shape, supports size style
+     function WaypointShape()
+     {
+         mxCylinder.call(this);
+     };
+     mxUtils.extend(WaypointShape, mxCylinder);
+     WaypointShape.prototype.size = 6;
+     
+     WaypointShape.prototype.paintVertexShape = function(c, x, y, w, h)
+     {
+         c.setFillColor(this.stroke);
+         var s = Math.max(0, parseFloat(mxUtils.getValue(this.style, 'size', this.size)) - 2) + 2 * this.strokewidth;
+         c.ellipse(x + (w - s) * 0.5, y + (h - s) * 0.5, s, s);
+         c.fill();
+         
+         c.setFillColor(mxConstants.NONE);
+         c.rect(x, y, w, h);
+         c.fill();
+     };
+ 
+     mxCellRenderer.registerShape('waypoint', WaypointShape);
      
      // Cube Shape, supports size style
      function IsoRectangleShape()
@@ -151,7 +398,7 @@
      };
  
      mxCellRenderer.registerShape('isoCube', IsoCubeShape);
-     
+ 
      // DataStore Shape, supports size style
      function DataStoreShape()
      {
@@ -271,6 +518,174 @@
      mxCellRenderer.registerShape('note', NoteShape);
  
      // Note Shape, supports size style
+     function NoteShape2()
+     {
+         NoteShape.call(this);
+     };
+     mxUtils.extend(NoteShape2, NoteShape);
+     
+     mxCellRenderer.registerShape('note2', NoteShape2);
+ 
+     NoteShape2.prototype.getLabelMargins = function(rect)
+     {
+         if (mxUtils.getValue(this.style, 'boundedLbl', false))
+         {
+             var size = mxUtils.getValue(this.style, 'size', 15);
+             
+             return new mxRectangle(0, Math.min(rect.height * this.scale, size * this.scale), 0, 0);
+         }
+         
+         return null;
+     };
+ 
+     // Flexible cube Shape
+     function IsoCubeShape2()
+     {
+         mxShape.call(this);
+     };
+     mxUtils.extend(IsoCubeShape2, mxShape);
+     IsoCubeShape2.prototype.isoAngle = 15;
+     
+     IsoCubeShape2.prototype.paintVertexShape = function(c, x, y, w, h)
+     {
+         var isoAngle = Math.max(0.01, Math.min(94, parseFloat(mxUtils.getValue(this.style, 'isoAngle', this.isoAngle)))) * Math.PI / 200 ;
+         var isoH = Math.min(w * Math.tan(isoAngle), h * 0.5);
+ 
+         c.translate(x,y);
+         
+         c.begin();
+         c.moveTo(w * 0.5, 0);
+         c.lineTo(w, isoH);
+         c.lineTo(w, h - isoH);
+         c.lineTo(w * 0.5, h);
+         c.lineTo(0, h - isoH);
+         c.lineTo(0, isoH);
+         c.close();
+         c.fillAndStroke();
+         
+         c.setShadow(false);
+         
+         c.begin();
+         c.moveTo(0, isoH);
+         c.lineTo(w * 0.5, 2 * isoH);
+         c.lineTo(w, isoH);
+         c.moveTo(w * 0.5, 2 * isoH);
+         c.lineTo(w * 0.5, h);
+         c.stroke();
+     };
+     
+     mxCellRenderer.registerShape('isoCube2', IsoCubeShape2);
+     
+     // (LEGACY) Flexible cylinder Shape
+     function CylinderShape()
+     {
+         mxShape.call(this);
+     };
+     
+     mxUtils.extend(CylinderShape, mxShape);
+     
+     CylinderShape.prototype.size = 15;
+     
+     CylinderShape.prototype.paintVertexShape = function(c, x, y, w, h)
+     {
+         var size = Math.max(0, Math.min(h * 0.5, parseFloat(mxUtils.getValue(this.style, 'size', this.size))));
+ 
+         c.translate(x,y);
+ 
+         if (size == 0)
+         {
+             c.rect(0, 0, w, h);
+             c.fillAndStroke();
+         }
+         else
+         {
+             c.begin();
+             c.moveTo(0, size);
+             c.arcTo(w * 0.5, size, 0, 0, 1, w * 0.5, 0);
+             c.arcTo(w * 0.5, size, 0, 0, 1, w, size);
+             c.lineTo(w, h - size);
+             c.arcTo(w * 0.5, size, 0, 0, 1, w * 0.5, h);
+             c.arcTo(w * 0.5, size, 0, 0, 1, 0, h - size);
+             c.close();
+             c.fillAndStroke();
+             
+             c.setShadow(false);
+             
+             c.begin();
+             c.moveTo(w, size);
+             c.arcTo(w * 0.5, size, 0, 0, 1, w * 0.5, 2 * size);
+             c.arcTo(w * 0.5, size, 0, 0, 1, 0, size);
+             c.stroke();
+         }
+     };
+     
+     mxCellRenderer.registerShape('cylinder2', CylinderShape);
+     
+     // Flexible cylinder3 Shape with offset label
+     function CylinderShape3(bounds, fill, stroke, strokewidth)
+     {
+         mxShape.call(this);
+         this.bounds = bounds;
+         this.fill = fill;
+         this.stroke = stroke;
+         this.strokewidth = (strokewidth != null) ? strokewidth : 1;
+     };
+     
+     mxUtils.extend(CylinderShape3, mxCylinder);
+ 
+     CylinderShape3.prototype.size = 15;
+     
+     CylinderShape3.prototype.paintVertexShape = function(c, x, y, w, h)
+     {
+         var size = Math.max(0, Math.min(h * 0.5, parseFloat(mxUtils.getValue(this.style, 'size', this.size))));
+         var lid = mxUtils.getValue(this.style, 'lid', true);
+ 
+         c.translate(x,y);
+ 
+         if (size == 0)
+         {
+             c.rect(0, 0, w, h);
+             c.fillAndStroke();
+         }
+         else
+         {
+             c.begin();
+             
+             if (lid)
+             {
+                 c.moveTo(0, size);
+                 c.arcTo(w * 0.5, size, 0, 0, 1, w * 0.5, 0);
+                 c.arcTo(w * 0.5, size, 0, 0, 1, w, size);
+             }
+             else
+             {
+                 c.moveTo(0, 0);
+                 c.arcTo(w * 0.5, size, 0, 0, 0, w * 0.5, size);
+                 c.arcTo(w * 0.5, size, 0, 0, 0, w, 0);
+             }
+ 
+             c.lineTo(w, h - size);
+             c.arcTo(w * 0.5, size, 0, 0, 1, w * 0.5, h);
+             c.arcTo(w * 0.5, size, 0, 0, 1, 0, h - size);
+             c.close();
+             c.fillAndStroke();
+             
+             c.setShadow(false);
+             
+             if (lid)
+             {
+                 c.begin();
+                 c.moveTo(w, size);
+                 c.arcTo(w * 0.5, size, 0, 0, 1, w * 0.5, 2 * size);
+                 c.arcTo(w * 0.5, size, 0, 0, 1, 0, size);
+                 c.stroke();
+             }
+         }
+     };
+ 
+     mxCellRenderer.registerShape('cylinder3', CylinderShape3);
+     
+     // Switch Shape, supports size style
      function SwitchShape()
      {
          mxActor.call(this);
@@ -298,55 +713,236 @@
      FolderShape.prototype.tabWidth = 60;
      FolderShape.prototype.tabHeight = 20;
      FolderShape.prototype.tabPosition = 'right';
-     FolderShape.prototype.redrawPath = function(path, x, y, w, h, isForeground)
+     FolderShape.prototype.arcSize = 0.1;
+     
+     FolderShape.prototype.paintVertexShape = function(c, x, y, w, h)
      {
+         c.translate(x, y);
+         
          var dx = Math.max(0, Math.min(w, parseFloat(mxUtils.getValue(this.style, 'tabWidth', this.tabWidth))));
          var dy = Math.max(0, Math.min(h, parseFloat(mxUtils.getValue(this.style, 'tabHeight', this.tabHeight))));
          var tp = mxUtils.getValue(this.style, 'tabPosition', this.tabPosition);
- 
-         if (isForeground)
+         var rounded = mxUtils.getValue(this.style, 'rounded', false);
+         var absArcSize = mxUtils.getValue(this.style, 'absoluteArcSize', false);
+         var arcSize = parseFloat(mxUtils.getValue(this.style, 'arcSize', this.arcSize));
+         
+         if (!absArcSize)
          {
-             if (tp == 'left')
-             {
-                 path.moveTo(0, dy);
-                 path.lineTo(dx, dy);
-             }
-             // Right is default
-             else
-             {
-                 path.moveTo(w - dx, dy);
-                 path.lineTo(w, dy);
-             }
+             arcSize = Math.min(w, h) * arcSize;
+         }
+         
+         arcSize = Math.min(arcSize, w * 0.5, (h - dy) * 0.5);
+         
+         dx = Math.max(dx, arcSize);
+         dx = Math.min(w - arcSize, dx);
              
-             path.end();
+         if (!rounded)
+         {
+             arcSize = 0;
+         }
+         
+         c.begin();
+         
+         if (tp == 'left')
+         {
+             c.moveTo(Math.max(arcSize, 0), dy);
+             c.lineTo(Math.max(arcSize, 0), 0);
+             c.lineTo(dx, 0);
+             c.lineTo(dx, dy);
+         }
+         // Right is default
+         else
+         {
+             c.moveTo(w - dx, dy);
+             c.lineTo(w - dx, 0);
+             c.lineTo(w - Math.max(arcSize, 0), 0);
+             c.lineTo(w - Math.max(arcSize, 0), dy);
+         }
+         
+         if (rounded)
+         {
+             c.moveTo(0, arcSize + dy);
+             c.arcTo(arcSize, arcSize, 0, 0, 1, arcSize, dy);
+             c.lineTo(w - arcSize, dy);
+             c.arcTo(arcSize, arcSize, 0, 0, 1, w, arcSize + dy);
+             c.lineTo(w, h - arcSize);
+             c.arcTo(arcSize, arcSize, 0, 0, 1, w - arcSize, h);
+             c.lineTo(arcSize, h);
+             c.arcTo(arcSize, arcSize, 0, 0, 1, 0, h - arcSize);
          }
          else
          {
-             if (tp == 'left')
-             {
-                 path.moveTo(0, 0);
-                 path.lineTo(dx, 0);
-                 path.lineTo(dx, dy);
-                 path.lineTo(w, dy);
-             }
-             // Right is default
-             else
-             {
-                 path.moveTo(0, dy);
-                 path.lineTo(w - dx, dy);
-                 path.lineTo(w - dx, 0);
-                 path.lineTo(w, 0);
-             }
-             
-             path.lineTo(w, h);
-             path.lineTo(0, h);
-             path.lineTo(0, dy);
-             path.close();
-             path.end();
+             c.moveTo(0, dy);
+             c.lineTo(w, dy);
+             c.lineTo(w, h);
+             c.lineTo(0, h);
+         }
+         
+         c.close();
+         c.fillAndStroke();
+         
+         c.setShadow(false);
+     
+         var sym = mxUtils.getValue(this.style, 'folderSymbol', null);
+         
+         if (sym == 'triangle')
+         {
+             c.begin();
+             c.moveTo(w - 30, dy + 20);
+             c.lineTo(w - 20, dy + 10);
+             c.lineTo(w - 10, dy + 20);
+             c.close();
+             c.stroke();
          }
      };
  
      mxCellRenderer.registerShape('folder', FolderShape);
+ 
+     FolderShape.prototype.getLabelMargins = function(rect)
+     {
+         if (mxUtils.getValue(this.style, 'boundedLbl', false))
+         {
+             var sizeY = mxUtils.getValue(this.style, 'tabHeight', 15) * this.scale;
+ 
+             if (mxUtils.getValue(this.style, 'labelInHeader', false))
+             {
+                 var sizeX = mxUtils.getValue(this.style, 'tabWidth', 15) * this.scale;
+                 var sizeY = mxUtils.getValue(this.style, 'tabHeight', 15) * this.scale;
+                 var rounded = mxUtils.getValue(this.style, 'rounded', false);
+                 var absArcSize = mxUtils.getValue(this.style, 'absoluteArcSize', false);
+                 var arcSize = parseFloat(mxUtils.getValue(this.style, 'arcSize', this.arcSize));
+                 
+                 if (!absArcSize)
+                 {
+                     arcSize = Math.min(rect.width, rect.height) * arcSize;
+                 }
+                 
+                 arcSize = Math.min(arcSize, rect.width * 0.5, (rect.height - sizeY) * 0.5);
+                     
+                 if (!rounded)
+                 {
+                     arcSize = 0;
+                 }
+ 
+                 if (mxUtils.getValue(this.style, 'tabPosition', this.tabPosition) == 'left')
+                 {
+                     return new mxRectangle(arcSize, 0, Math.min(rect.width, rect.width - sizeX), Math.min(rect.height, rect.height - sizeY));
+                 }
+                 else
+                 {
+                     return new mxRectangle(Math.min(rect.width, rect.width - sizeX), 0, arcSize, Math.min(rect.height, rect.height - sizeY));
+                 }
+             }
+             else
+             {
+                 return new mxRectangle(0, Math.min(rect.height, sizeY), 0, 0);
+             }
+         }
+         
+         return null;
+     };
+         
+     //**********************************************************************************************************************************************************
+     //UML State shape
+     //**********************************************************************************************************************************************************
+     function UMLStateShape()
+     {
+         mxCylinder.call(this);
+     };
+     mxUtils.extend(UMLStateShape, mxCylinder);
+     UMLStateShape.prototype.arcSize = 0.1;
+ 
+     UMLStateShape.prototype.paintVertexShape = function(c, x, y, w, h)
+     {
+         c.translate(x, y);
+         
+         var rounded = mxUtils.getValue(this.style, 'rounded', false);
+         var absArcSize = mxUtils.getValue(this.style, 'absoluteArcSize', false);
+         var arcSize = parseFloat(mxUtils.getValue(this.style, 'arcSize', this.arcSize));
+         var connPoint = mxUtils.getValue(this.style, 'umlStateConnection', null);
+         
+         if (!absArcSize)
+         {
+             arcSize = Math.min(w, h) * arcSize;
+         }
+         
+         arcSize = Math.min(arcSize, w * 0.5, h * 0.5);
+         
+         if (!rounded)
+         {
+             arcSize = 0;
+         }
+         
+         var dx = 0;
+         
+         if (connPoint != null)
+         {
+             dx = 10;
+         }
+         
+         c.begin();
+         c.moveTo(dx, arcSize);
+         c.arcTo(arcSize, arcSize, 0, 0, 1, dx + arcSize, 0);
+         c.lineTo(w - arcSize, 0);
+         c.arcTo(arcSize, arcSize, 0, 0, 1, w, arcSize);
+         c.lineTo(w, h - arcSize);
+         c.arcTo(arcSize, arcSize, 0, 0, 1, w - arcSize, h);
+         c.lineTo(dx + arcSize, h);
+         c.arcTo(arcSize, arcSize, 0, 0, 1, dx, h - arcSize);
+         c.close();
+         c.fillAndStroke();
+         
+         c.setShadow(false);
+ 
+         var sym = mxUtils.getValue(this.style, 'umlStateSymbol', null);
+         
+         if (sym == 'collapseState')
+         {
+             c.roundrect(w - 40, h - 20, 10, 10, 3, 3);
+             c.stroke();
+             c.roundrect(w - 20, h - 20, 10, 10, 3, 3);
+             c.stroke();
+             c.begin();
+             c.moveTo(w - 30, h - 15);
+             c.lineTo(w - 20, h - 15);
+             c.stroke();
+         }
+ 
+         if (connPoint == 'connPointRefEntry')
+         {
+             c.ellipse(0, h * 0.5 - 10, 20, 20);
+             c.fillAndStroke();
+         }
+         else if (connPoint == 'connPointRefExit')
+         {
+             c.ellipse(0, h * 0.5 - 10, 20, 20);
+             c.fillAndStroke();
+             
+             c.begin();
+             c.moveTo(5, h * 0.5 - 5);
+             c.lineTo(15, h * 0.5 + 5);
+             c.moveTo(15, h * 0.5 - 5);
+             c.lineTo(5, h * 0.5 + 5);
+             c.stroke();
+         }
+     };
+ 
+     UMLStateShape.prototype.getLabelMargins = function(rect)
+     {
+         if (mxUtils.getValue(this.style, 'boundedLbl', false))
+         {
+             var connPoint = mxUtils.getValue(this.style, 'umlStateConnection', null);
+             
+             if (connPoint != null)
+             {
+                 return new mxRectangle(10 * this.scale, 0, 0, 0);
+             }
+         }
+         
+         return null;
+     };
+ 
+     mxCellRenderer.registerShape('umlState', UMLStateShape);
  
      // Card shape
      function CardShape()
@@ -484,6 +1080,94 @@
          return null;
      };
  
+     CylinderShape3.prototype.getLabelMargins = function(rect)
+     {
+         if (mxUtils.getValue(this.style, 'boundedLbl', false))
+         {
+             var size = mxUtils.getValue(this.style, 'size', 15);
+             
+             if (!mxUtils.getValue(this.style, 'lid', true))
+             {
+                 size /= 2;
+             }
+             
+             return new mxRectangle(0, Math.min(rect.height * this.scale, size * 2 * this.scale), 0, Math.max(0, size * 0.3 * this.scale));
+         }
+         
+         return null;
+     };
+ 
+     FolderShape.prototype.getLabelMargins = function(rect)
+     {
+         if (mxUtils.getValue(this.style, 'boundedLbl', false))
+         {
+             var sizeY = mxUtils.getValue(this.style, 'tabHeight', 15) * this.scale;
+ 
+             if (mxUtils.getValue(this.style, 'labelInHeader', false))
+             {
+                 var sizeX = mxUtils.getValue(this.style, 'tabWidth', 15) * this.scale;
+                 var sizeY = mxUtils.getValue(this.style, 'tabHeight', 15) * this.scale;
+                 var rounded = mxUtils.getValue(this.style, 'rounded', false);
+                 var absArcSize = mxUtils.getValue(this.style, 'absoluteArcSize', false);
+                 var arcSize = parseFloat(mxUtils.getValue(this.style, 'arcSize', this.arcSize));
+                 
+                 if (!absArcSize)
+                 {
+                     arcSize = Math.min(rect.width, rect.height) * arcSize;
+                 }
+                 
+                 arcSize = Math.min(arcSize, rect.width * 0.5, (rect.height - sizeY) * 0.5);
+                     
+                 if (!rounded)
+                 {
+                     arcSize = 0;
+                 }
+     
+                 if (mxUtils.getValue(this.style, 'tabPosition', this.tabPosition) == 'left')
+                 {
+                     return new mxRectangle(arcSize, 0, Math.min(rect.width, rect.width - sizeX), Math.min(rect.height, rect.height - sizeY));
+                 }
+                 else
+                 {
+                     return new mxRectangle(Math.min(rect.width, rect.width - sizeX), 0, arcSize, Math.min(rect.height, rect.height - sizeY));
+                 }
+             }
+             else
+             {
+                 return new mxRectangle(0, Math.min(rect.height, sizeY), 0, 0);
+             }
+         }
+         
+         return null;
+     };
+ 
+     UMLStateShape.prototype.getLabelMargins = function(rect)
+     {
+         if (mxUtils.getValue(this.style, 'boundedLbl', false))
+         {
+             var connPoint = mxUtils.getValue(this.style, 'umlStateConnection', null);
+             
+             if (connPoint != null)
+             {
+                 return new mxRectangle(10 * this.scale, 0, 0, 0);
+             }
+         }
+         
+         return null;
+     };
+ 
+     NoteShape2.prototype.getLabelMargins = function(rect)
+     {
+         if (mxUtils.getValue(this.style, 'boundedLbl', false))
+         {
+             var size = mxUtils.getValue(this.style, 'size', 15);
+             
+             return new mxRectangle(0, Math.min(rect.height * this.scale, size * this.scale), 0, Math.max(0, size * this.scale));
+         }
+         
+         return null;
+     };
+ 
      // Parallelogram shape
      function ParallelogramShape()
      {
@@ -491,13 +1175,16 @@
      };
      mxUtils.extend(ParallelogramShape, mxActor);
      ParallelogramShape.prototype.size = 0.2;
+     ParallelogramShape.prototype.fixedSize = 20;
      ParallelogramShape.prototype.isRoundable = function()
      {
          return true;
      };
      ParallelogramShape.prototype.redrawPath = function(c, x, y, w, h)
      {
-         var dx = w * Math.max(0, Math.min(1, parseFloat(mxUtils.getValue(this.style, 'size', this.size))));
+         var fixed = mxUtils.getValue(this.style, 'fixedSize', '0') != '0';
+ 
+         var dx = (fixed) ? Math.max(0, Math.min(w, parseFloat(mxUtils.getValue(this.style, 'size', this.fixedSize)))) : w * Math.max(0, Math.min(1, parseFloat(mxUtils.getValue(this.style, 'size', this.size))));
          var arcSize = mxUtils.getValue(this.style, mxConstants.STYLE_ARCSIZE, mxConstants.LINE_ARCSIZE) / 2;
          this.addPoints(c, [new mxPoint(0, h), new mxPoint(dx, 0), new mxPoint(w, 0), new mxPoint(w - dx, h)],
                  this.isRounded, arcSize, true);
@@ -513,13 +1200,17 @@
      };
      mxUtils.extend(TrapezoidShape, mxActor);
      TrapezoidShape.prototype.size = 0.2;
+     TrapezoidShape.prototype.fixedSize = 20;
      TrapezoidShape.prototype.isRoundable = function()
      {
          return true;
      };
      TrapezoidShape.prototype.redrawPath = function(c, x, y, w, h)
      {
-         var dx = w * Math.max(0, Math.min(0.5, parseFloat(mxUtils.getValue(this.style, 'size', this.size))));
+         
+         var fixed = mxUtils.getValue(this.style, 'fixedSize', '0') != '0';
+ 
+         var dx = (fixed) ? Math.max(0, Math.min(w * 0.5, parseFloat(mxUtils.getValue(this.style, 'size', this.fixedSize)))) : w * Math.max(0, Math.min(0.5, parseFloat(mxUtils.getValue(this.style, 'size', this.size))));
          var arcSize = mxUtils.getValue(this.style, mxConstants.STYLE_ARCSIZE, mxConstants.LINE_ARCSIZE) / 2;
          this.addPoints(c, [new mxPoint(0, h), new mxPoint(dx, 0), new mxPoint(w - dx, 0), new mxPoint(w, h)],
                  this.isRounded, arcSize, true);
@@ -710,18 +1401,24 @@
           this.canvas.arcTo = this.originalArcTo;
      };
      
-     // Installs hand jiggle in all shapes
-     var mxShapePaint0 = mxShape.prototype.paint;
-     mxShape.prototype.defaultJiggle = 1.5;
-     mxShape.prototype.paint = function(c)
+     // Installs hand jiggle for comic and sketch style
+     mxShape.prototype.defaultJiggle = 1.5;	
+ 
+     var shapeBeforePaint = mxShape.prototype.beforePaint;
+     mxShape.prototype.beforePaint = function(c)
      {
-         // NOTE: getValue does not return a boolean value so !('0') would return true here and below
-         if (this.style != null && mxUtils.getValue(this.style, 'comic', '0') != '0' && c.handHiggle == null)
-         {
-             c.handJiggle = new HandJiggle(c, mxUtils.getValue(this.style, 'jiggle', this.defaultJiggle));
-         }
+         shapeBeforePaint.apply(this, arguments);
          
-         mxShapePaint0.apply(this, arguments);
+         if (c.handJiggle == null)
+         {
+             c.handJiggle = this.createHandJiggle(c);
+         }
+     };
+     
+     var shapeAfterPaint = mxShape.prototype.afterPaint;
+     mxShape.prototype.afterPaint = function(c)
+     {
+         shapeAfterPaint.apply(this, arguments);
          
          if (c.handJiggle != null)
          {
@@ -729,36 +1426,52 @@
              delete c.handJiggle;
          }
      };
+         
+     // Returns a new HandJiggle canvas
+     mxShape.prototype.createComicCanvas = function(c)
+     {
+         return new HandJiggle(c, mxUtils.getValue(this.style, 'jiggle', this.defaultJiggle));
+     };
+     
+     // Overrides to avoid call to rect
+     mxShape.prototype.createHandJiggle = function(c)
+     {
+         if (!this.outline && this.style != null && mxUtils.getValue(this.style, 'comic', '0') != '0')
+         {
+             return this.createComicCanvas(c);
+         }
+         
+         return null;
+     };
      
      // Sets default jiggle for diamond
      mxRhombus.prototype.defaultJiggle = 2;
  
-     /**
-      * Overrides to avoid call to rect
-      */
+     // Overrides to avoid call to rect
      var mxRectangleShapeIsHtmlAllowed0 = mxRectangleShape.prototype.isHtmlAllowed;
      mxRectangleShape.prototype.isHtmlAllowed = function()
      {
-         return (this.style == null || mxUtils.getValue(this.style, 'comic', '0') == '0') &&
+         return !this.outline && (this.style == null || (mxUtils.getValue(this.style, 'comic', '0') == '0' &&
+             mxUtils.getValue(this.style, 'sketch', (urlParams['rough'] == '1') ? '1' : '0') == '0')) &&
              mxRectangleShapeIsHtmlAllowed0.apply(this, arguments);
      };
      
      var mxRectangleShapePaintBackground0 = mxRectangleShape.prototype.paintBackground;
      mxRectangleShape.prototype.paintBackground = function(c, x, y, w, h)
      {
-         if (c.handJiggle == null)
+         if (c.handJiggle == null || c.handJiggle.constructor != HandJiggle)
          {
              mxRectangleShapePaintBackground0.apply(this, arguments);
          }
          else
          {
              var events = true;
-             
+ 
              if (this.style != null)
              {
                  events = mxUtils.getValue(this.style, mxConstants.STYLE_POINTER_EVENTS, '1') == '1';		
              }
-             
+ 
              if (events || (this.fill != null && this.fill != mxConstants.NONE) ||
                  (this.stroke != null && this.stroke != mxConstants.NONE))
              {
@@ -766,13 +1479,13 @@
                  {
                      c.pointerEvents = false;
                  }
-                 
+ 
                  c.begin();
-                 
+ 
                  if (this.isRounded)
                  {
                      var r = 0;
-                     
+ 
                      if (mxUtils.getValue(this.style, mxConstants.STYLE_ABSOLUTE_ARCSIZE, 0) == '1')
                      {
                          r = Math.min(w / 2, Math.min(h / 2, mxUtils.getValue(this.style,
@@ -784,7 +1497,7 @@
                              mxConstants.RECTANGLE_ROUNDING_FACTOR * 100) / 100;
                          r = Math.min(w * f, h * f);
                      }
-                     
+ 
                      c.moveTo(x + r, y);
                      c.lineTo(x + w - r, y);
                      c.quadTo(x + w, y, x + w, y + r);
@@ -797,35 +1510,21 @@
                  }
                  else
                  {
-                     
                      c.moveTo(x, y);
                      c.lineTo(x + w, y);
                      c.lineTo(x + w, y + h);
                      c.lineTo(x, y + h);
                      c.lineTo(x, y);
                  }
-                 
+ 
                  // LATER: Check if close is needed here
                  c.close();
                  c.end();
-                 
+ 
                  c.fillAndStroke();
              }			
          }
      };
- 
-     /**
-      * Disables glass effect with hand jiggle.
-      */
-     var mxRectangleShapePaintForeground0 = mxRectangleShape.prototype.paintForeground;
-     mxRectangleShape.prototype.paintForeground = function(c, x, y, w, h)
-     {
-         if (c.handJiggle == null)
-         {
-             mxRectangleShapePaintForeground0.apply(this, arguments);
-         }
-     };
- 
      // End of hand jiggle integration
      
      // Process Shape
@@ -835,6 +1534,8 @@
      };
      mxUtils.extend(ProcessShape, mxRectangleShape);
      ProcessShape.prototype.size = 0.1;
+     ProcessShape.prototype.fixedSize = false;
+     
      ProcessShape.prototype.isHtmlAllowed = function()
      {
          return false;
@@ -867,10 +1568,21 @@
          
          return rect;
      };
+ 
      ProcessShape.prototype.paintForeground = function(c, x, y, w, h)
      {
-         var inset = w * Math.max(0, Math.min(1, parseFloat(mxUtils.getValue(this.style, 'size', this.size))));
- 
+         var isFixedSize = mxUtils.getValue(this.style, 'fixedSize', this.fixedSize);
+         var inset = parseFloat(mxUtils.getValue(this.style, 'size', this.size));
+         
+         if (isFixedSize)
+         {
+             inset = Math.max(0, Math.min(w, inset));
+         }
+         else
+         {
+             inset = w * Math.max(0, Math.min(1, inset));
+         }
+     
          if (this.isRounded)
          {
              var f = mxUtils.getValue(this.style, mxConstants.STYLE_ARCSIZE,
@@ -892,6 +1604,8 @@
      };
  
      mxCellRenderer.registerShape('process', ProcessShape);
+     //Register the same shape with another name for backwards compatibility
+     mxCellRenderer.registerShape('process2', ProcessShape);
      
      // Transparent Shape
      function TransparentShape()
@@ -976,13 +1690,16 @@
      };
      mxUtils.extend(HexagonShape, mxHexagon);
      HexagonShape.prototype.size = 0.25;
+     HexagonShape.prototype.fixedSize = 20;
      HexagonShape.prototype.isRoundable = function()
      {
          return true;
      };
      HexagonShape.prototype.redrawPath = function(c, x, y, w, h)
      {
-         var s =  w * Math.max(0, Math.min(1, parseFloat(mxUtils.getValue(this.style, 'size', this.size))));
+         var fixed = mxUtils.getValue(this.style, 'fixedSize', '0') != '0';
+         var s = (fixed) ? Math.max(0, Math.min(w * 0.5, parseFloat(mxUtils.getValue(this.style, 'size', this.fixedSize)))) :
+             w * Math.max(0, Math.min(1, parseFloat(mxUtils.getValue(this.style, 'size', this.size))));
          var arcSize = mxUtils.getValue(this.style, mxConstants.STYLE_ARCSIZE, mxConstants.LINE_ARCSIZE) / 2;
          this.addPoints(c, [new mxPoint(s, 0), new mxPoint(w - s, 0), new mxPoint(w, 0.5 * h), new mxPoint(w - s, h),
                             new mxPoint(s, h), new mxPoint(0, 0.5 * h)], this.isRounded, arcSize, true);
@@ -1240,7 +1957,7 @@
      // Replaces existing actor shape
      mxCellRenderer.registerShape('umlActor', UmlActorShape);
      
-     // UML Boundary Shape
+     ////////////// UML Boundary Shape ///////////////
      function UmlBoundaryShape()
      {
          mxShape.call(this);
@@ -1273,7 +1990,6 @@
          c.fillAndStroke();
      };
  
-     // Replaces existing actor shape
      mxCellRenderer.registerShape('umlBoundary', UmlBoundaryShape);
  
      // UML Entity Shape
@@ -1397,7 +2113,7 @@
          
          if (size < h)
          {
-             c.setDashed(true);
+             c.setDashed(mxUtils.getValue(this.style, 'lifelineDashed', '1') == '1');
              c.begin();
              c.moveTo(x + w / 2, y + size);
              c.lineTo(x + w / 2, y + h);
@@ -1471,6 +2187,13 @@
      };
  
      mxCellRenderer.registerShape('umlFrame', UmlFrame);
+         
+     mxPerimeter.CenterPerimeter = function (bounds, vertex, next, orthogonal)
+     {
+         return new mxPoint(bounds.getCenterX(), bounds.getCenterY());
+     };
+     
+     mxStyleRegistry.putValue('centerPerimeter', mxPerimeter.CenterPerimeter);
      
      mxPerimeter.LifelinePerimeter = function (bounds, vertex, next, orthogonal)
      {
@@ -1554,11 +2277,17 @@
      // Parallelogram Perimeter
      mxPerimeter.ParallelogramPerimeter = function (bounds, vertex, next, orthogonal)
      {
-         var size = ParallelogramShape.prototype.size;
+         var fixed = mxUtils.getValue(vertex.style, 'fixedSize', '0') != '0';
+         var size = (fixed) ? ParallelogramShape.prototype.fixedSize : ParallelogramShape.prototype.size;
          
          if (vertex != null)
          {
              size = mxUtils.getValue(vertex.style, 'size', size);
+         }
+         
+         if (fixed)
+         {
+             size *= vertex.view.scale;
          }
          
          var x = bounds.x;
@@ -1575,13 +2304,13 @@
          
          if (vertical)
          {
-             var dy = h * Math.max(0, Math.min(1, size));
+             var dy = (fixed) ? Math.max(0, Math.min(h, size)) : h * Math.max(0, Math.min(1, size));
              points = [new mxPoint(x, y), new mxPoint(x + w, y + dy),
                          new mxPoint(x + w, y + h), new mxPoint(x, y + h - dy), new mxPoint(x, y)];
          }
          else
          {
-             var dx = w * Math.max(0, Math.min(1, size));
+             var dx = (fixed) ? Math.max(0, Math.min(w * 0.5, size)) : w * Math.max(0, Math.min(1, size));
              points = [new mxPoint(x + dx, y), new mxPoint(x + w, y),
                              new mxPoint(x + w - dx, y + h), new mxPoint(x, y + h), new mxPoint(x + dx, y)];
          }	
@@ -1611,11 +2340,17 @@
      // Trapezoid Perimeter
      mxPerimeter.TrapezoidPerimeter = function (bounds, vertex, next, orthogonal)
      {
-         var size = TrapezoidShape.prototype.size;
+         var fixed = mxUtils.getValue(vertex.style, 'fixedSize', '0') != '0';
+         var size = (fixed) ? TrapezoidShape.prototype.fixedSize : TrapezoidShape.prototype.size;
          
          if (vertex != null)
          {
              size = mxUtils.getValue(vertex.style, 'size', size);
+         }
+         
+         if (fixed)
+         {
+             size *= vertex.view.scale;
          }
          
          var x = bounds.x;
@@ -1626,29 +2361,29 @@
          var direction = (vertex != null) ? mxUtils.getValue(
                  vertex.style, mxConstants.STYLE_DIRECTION,
                  mxConstants.DIRECTION_EAST) : mxConstants.DIRECTION_EAST;
-         var points;
+         var points = [];
          
          if (direction == mxConstants.DIRECTION_EAST)
          {
-             var dx = w * Math.max(0, Math.min(1, size));
+             var dx = (fixed) ? Math.max(0, Math.min(w * 0.5, size)) : w * Math.max(0, Math.min(1, size));
              points = [new mxPoint(x + dx, y), new mxPoint(x + w - dx, y),
                          new mxPoint(x + w, y + h), new mxPoint(x, y + h), new mxPoint(x + dx, y)];
          }
          else if (direction == mxConstants.DIRECTION_WEST)
          {
-             var dx = w * Math.max(0, Math.min(1, size));
+             var dx = (fixed) ? Math.max(0, Math.min(w, size)) : w * Math.max(0, Math.min(1, size));
              points = [new mxPoint(x, y), new mxPoint(x + w, y),
                          new mxPoint(x + w - dx, y + h), new mxPoint(x + dx, y + h), new mxPoint(x, y)];
          }
          else if (direction == mxConstants.DIRECTION_NORTH)
          {
-             var dy = h * Math.max(0, Math.min(1, size));
+             var dy = (fixed) ? Math.max(0, Math.min(h, size)) : h * Math.max(0, Math.min(1, size));
              points = [new mxPoint(x, y + dy), new mxPoint(x + w, y),
                          new mxPoint(x + w, y + h), new mxPoint(x, y + h - dy), new mxPoint(x, y + dy)];
          }
          else
          {
-             var dy = h * Math.max(0, Math.min(1, size));
+             var dy = (fixed) ? Math.max(0, Math.min(h, size)) : h * Math.max(0, Math.min(1, size));
              points = [new mxPoint(x, y), new mxPoint(x + w, y + dy),
                          new mxPoint(x + w, y + h - dy), new mxPoint(x, y + h), new mxPoint(x, y)];
          }		
@@ -1684,6 +2419,11 @@
          if (vertex != null)
          {
              size = mxUtils.getValue(vertex.style, 'size', size);
+         }
+         
+         if (fixed)
+         {
+             size *= vertex.view.scale;
          }
          
          var x = bounds.x;
@@ -1750,11 +2490,17 @@
      // Hexagon Perimeter 2 (keep existing one)
      mxPerimeter.HexagonPerimeter2 = function (bounds, vertex, next, orthogonal)
      {
-         var size = HexagonShape.prototype.size;
+         var fixed = mxUtils.getValue(vertex.style, 'fixedSize', '0') != '0';
+         var size = (fixed) ? HexagonShape.prototype.fixedSize : HexagonShape.prototype.size;
          
          if (vertex != null)
          {
              size = mxUtils.getValue(vertex.style, 'size', size);
+         }
+         
+         if (fixed)
+         {
+             size *= vertex.view.scale;
          }
          
          var x = bounds.x;
@@ -1774,14 +2520,14 @@
          
          if (vertical)
          {
-             var dy = h * Math.max(0, Math.min(1, size));
+             var dy = (fixed) ? Math.max(0, Math.min(h, size)) : h * Math.max(0, Math.min(1, size));
              points = [new mxPoint(cx, y), new mxPoint(x + w, y + dy), new mxPoint(x + w, y + h - dy),
                              new mxPoint(cx, y + h), new mxPoint(x, y + h - dy),
                              new mxPoint(x, y + dy), new mxPoint(cx, y)];
          }
          else
          {
-             var dx = w * Math.max(0, Math.min(1, size));
+             var dx = (fixed) ? Math.max(0, Math.min(w, size)) : w * Math.max(0, Math.min(1, size));
              points = [new mxPoint(x + dx, y), new mxPoint(x + w - dx, y), new mxPoint(x + w, cy),
                          new mxPoint(x + w - dx, y + h), new mxPoint(x + dx, y + h),
                          new mxPoint(x, cy), new mxPoint(x + dx, y)];
@@ -2312,10 +3058,13 @@
      };
      mxUtils.extend(DataStorageShape, mxActor);
      DataStorageShape.prototype.size = 0.1;
+     DataStorageShape.prototype.fixedSize = 20;
      DataStorageShape.prototype.redrawPath = function(c, x, y, w, h)
      {
-         var s = w * Math.max(0, Math.min(1, parseFloat(mxUtils.getValue(this.style, 'size', this.size))));
- 
+         var fixed = mxUtils.getValue(this.style, 'fixedSize', '0') != '0';
+         var s = (fixed) ? Math.max(0, Math.min(w, parseFloat(mxUtils.getValue(this.style, 'size', this.fixedSize)))) :
+             w * Math.max(0, Math.min(1, parseFloat(mxUtils.getValue(this.style, 'size', this.size))));
+         
          c.moveTo(s, 0);
          c.lineTo(w, 0);
          c.quadTo(w - s * 2, h / 2, w, h);
@@ -2571,18 +3320,25 @@
              c.setStrokeColor(null);
          }
  
-         mxRectangleShape.prototype.paintBackground.apply(this, arguments);
-         
          if (this.style != null)
          {
-             c.setStrokeColor(this.stroke);
+             var pointerEvents = c.pointerEvents;
+             var events = mxUtils.getValue(this.style, mxConstants.STYLE_POINTER_EVENTS, '1') == '1';
+             
+             if (!events && (this.fill == null || this.fill == mxConstants.NONE))
+             {
+                 c.pointerEvents = false;
+             }
+ 
              c.rect(x, y, w, h);
              c.fill();
  
+             c.pointerEvents = pointerEvents;
+             c.setStrokeColor(this.stroke);
              c.begin();
              c.moveTo(x, y);
              
-             if (mxUtils.getValue(this.style, 'top', '1') == '1')
+             if (this.outline || mxUtils.getValue(this.style, 'top', '1') == '1')
              {
                  c.lineTo(x + w, y);
              }
@@ -2591,7 +3347,7 @@
                  c.moveTo(x + w, y);
              }
              
-             if (mxUtils.getValue(this.style, 'right', '1') == '1')
+             if (this.outline || mxUtils.getValue(this.style, 'right', '1') == '1')
              {
                  c.lineTo(x + w, y + h);
              }
@@ -2600,7 +3356,7 @@
                  c.moveTo(x + w, y + h);
              }
              
-             if (mxUtils.getValue(this.style, 'bottom', '1') == '1')
+             if (this.outline || mxUtils.getValue(this.style, 'bottom', '1') == '1')
              {
                  c.lineTo(x, y + h);
              }
@@ -2609,7 +3365,7 @@
                  c.moveTo(x, y + h);
              }
              
-             if (mxUtils.getValue(this.style, 'left', '1') == '1')
+             if (this.outline || mxUtils.getValue(this.style, 'left', '1') == '1')
              {
                  c.lineTo(x, y);
              }
@@ -2728,7 +3484,1508 @@
      };
  
      mxCellRenderer.registerShape('display', DisplayShape);
-     
+ 
+     //**********************************************************************************************************************************************************
+     //Rectangle v2
+     //**********************************************************************************************************************************************************
+     /**
+     * Extends mxShape.
+     */
+     function mxShapeBasicRect2(bounds, fill, stroke, strokewidth)
+     {
+         mxShape.call(this);
+         this.bounds = bounds;
+         this.fill = fill;
+         this.stroke = stroke;
+         this.strokewidth = (strokewidth != null) ? strokewidth : 1;
+         this.rectStyle = 'square';
+         this.size = 10;
+         this.absoluteCornerSize = true;
+         this.indent = 2;
+         this.rectOutline = 'single';
+     };
+ 
+     /**
+     * Extends mxShape.
+     */
+     mxUtils.extend(mxShapeBasicRect2, mxActor);
+ 
+     mxShapeBasicRect2.prototype.cst = {RECT2 : 'mxgraph.basic.rect'};
+ 
+     mxShapeBasicRect2.prototype.customProperties = [
+         {name: 'rectStyle', dispName: 'Style', type: 'enum', defVal:'square',
+             enumList:[
+                 {val:'square', dispName:'Square'},
+                 {val:'rounded', dispName:'Round'},
+                 {val:'snip', dispName:'Snip'},
+                 {val:'invRound', dispName:'Inv. Round'},
+                 {val:'fold', dispName:'Fold'}
+             ]},
+         {name: 'size', dispName: 'Corner Size', type: 'float', defVal:10},
+         {name: 'absoluteCornerSize', dispName: 'Abs. Corner Size', type: 'bool', defVal:true},
+         {name: 'indent', dispName:'Indent', type:'float', defVal:2},
+         {name: 'rectOutline', dispName: 'Outline', type: 'enum', defVal:'single',
+             enumList:[
+                 {val:'single', dispName:'Single'},
+                 {val:'double', dispName:'Double'},
+                 {val:'frame', dispName:'Frame'}
+             ]},
+         {name: 'fillColor2', dispName:'Inside Fill Color', type:'color', defVal:'none'},
+         {name: 'gradientColor2', dispName:'Inside Gradient Color', type:'color', defVal:'none'},
+         {name: 'gradientDirection2', dispName: 'Inside Gradient Direction', type: 'enum', defVal:'south',
+             enumList:[
+                 {val:'south', dispName:'South'},
+                 {val:'west', dispName:'West'},
+                 {val:'north', dispName:'North'},
+                 {val:'east', dispName:'East'}
+         ]},
+         {name: 'top', dispName:'Top Line', type:'bool', defVal:true},
+         {name: 'right', dispName:'Right', type:'bool', defVal:true},
+         {name: 'bottom', dispName:'Bottom Line', type:'bool', defVal:true},
+         {name: 'left', dispName:'Left ', type:'bool', defVal:true},
+         {name: 'topLeftStyle', dispName: 'Top Left Style', type: 'enum', defVal:'default',
+         enumList:[
+             {val:'default', dispName:'Default'},
+             {val:'square', dispName:'Square'},
+             {val:'rounded', dispName:'Round'},
+             {val:'snip', dispName:'Snip'},
+             {val:'invRound', dispName:'Inv. Round'},
+             {val:'fold', dispName:'Fold'}
+         ]},
+         {name: 'topRightStyle', dispName: 'Top Right Style', type: 'enum', defVal:'default',
+             enumList:[
+                 {val:'default', dispName:'Default'},
+                 {val:'square', dispName:'Square'},
+                 {val:'rounded', dispName:'Round'},
+                 {val:'snip', dispName:'Snip'},
+                 {val:'invRound', dispName:'Inv. Round'},
+                 {val:'fold', dispName:'Fold'}
+         ]},
+         {name: 'bottomRightStyle', dispName: 'Bottom Right Style', type: 'enum', defVal:'default',
+             enumList:[
+                 {val:'default', dispName:'Default'},
+                 {val:'square', dispName:'Square'},
+                 {val:'rounded', dispName:'Round'},
+                 {val:'snip', dispName:'Snip'},
+                 {val:'invRound', dispName:'Inv. Round'},
+                 {val:'fold', dispName:'Fold'}
+         ]},
+         {name: 'bottomLeftStyle', dispName: 'Bottom Left Style', type: 'enum', defVal:'default',
+             enumList:[
+                 {val:'default', dispName:'Default'},
+                 {val:'square', dispName:'Square'},
+                 {val:'rounded', dispName:'Round'},
+                 {val:'snip', dispName:'Snip'},
+                 {val:'invRound', dispName:'Inv. Round'},
+                 {val:'fold', dispName:'Fold'}
+         ]},
+     ];
+ 
+     /**
+     * Function: paintVertexShape
+     * 
+     * Paints the vertex shape.
+     */
+     mxShapeBasicRect2.prototype.paintVertexShape = function(c, x, y, w, h)
+     {
+         c.translate(x, y);
+         this.strictDrawShape(c, 0, 0, w, h);
+     }
+ 
+     //
+     mxShapeBasicRect2.prototype.strictDrawShape = function(c, x, y, w, h, os)
+     {
+         // read styles or optionally override them externally via "os" variable
+         var rectStyle =	(os && os.rectStyle) ? os.rectStyle : mxUtils.getValue(this.style, 'rectStyle', this.rectStyle);
+         var absoluteCornerSize = (os && os.absoluteCornerSize) ? os.absoluteCornerSize : mxUtils.getValue(this.style, 'absoluteCornerSize', this.absoluteCornerSize);
+         var size =	(os && os.size) ? os.size : Math.max(0, Math.min(w, parseFloat(mxUtils.getValue(this.style, 'size', this.size))));
+         var rectOutline = (os && os.rectOutline) ? os.rectOutline : mxUtils.getValue(this.style, 'rectOutline', this.rectOutline);
+         var indent = (os && os.indent) ? os.indent : Math.max(0, Math.min(w, parseFloat(mxUtils.getValue(this.style, 'indent', this.indent))));
+         var dashed = (os && os.dashed) ? os.dashed : mxUtils.getValue(this.style, 'dashed', false);
+         var dashPattern = (os && os.dashPattern) ? os.dashPattern : mxUtils.getValue(this.style, 'dashPattern', null);
+         var relIndent = (os && os.relIndent) ? os.relIndent : Math.max(0, Math.min(50, indent));
+         var top = (os && os.top) ? os.top : mxUtils.getValue(this.style, 'top', true);
+         var right = (os && os.right) ? os.right : mxUtils.getValue(this.style, 'right', true);
+         var bottom = (os && os.bottom) ? os.bottom : mxUtils.getValue(this.style, 'bottom', true);
+         var left = (os && os.left) ? os.left : mxUtils.getValue(this.style, 'left', true);
+         var topLeftStyle = (os && os.topLeftStyle) ? os.topLeftStyle : mxUtils.getValue(this.style, 'topLeftStyle', 'default');
+         var topRightStyle = (os && os.topRightStyle) ? os.topRightStyle : mxUtils.getValue(this.style, 'topRightStyle', 'default');
+         var bottomRightStyle = (os && os.bottomRightStyle) ? os.bottomRightStyle : mxUtils.getValue(this.style, 'bottomRightStyle', 'default');
+         var bottomLeftStyle = (os && os.bottomLeftStyle) ? os.bottomLeftStyle : mxUtils.getValue(this.style, 'bottomLeftStyle', 'default');
+         var fillColor = (os && os.fillColor) ? os.fillColor : mxUtils.getValue(this.style, 'fillColor', '#ffffff');
+         var strokeColor = (os && os.strokeColor) ? os.strokeColor : mxUtils.getValue(this.style, 'strokeColor', '#000000');
+         var strokeWidth = (os && os.strokeWidth) ? os.strokeWidth : mxUtils.getValue(this.style, 'strokeWidth', '1');
+         var fillColor2 = (os && os.fillColor2) ? os.fillColor2 : mxUtils.getValue(this.style, 'fillColor2', 'none');
+         var gradientColor2 = (os && os.gradientColor2) ? os.gradientColor2 : mxUtils.getValue(this.style, 'gradientColor2', 'none');
+         var gdir2 = (os && os.gradientDirection2) ? os.gradientDirection2 : mxUtils.getValue(this.style, 'gradientDirection2', 'south');
+         var opacity = (os && os.opacity) ? os.opacity : mxUtils.getValue(this.style, 'opacity', '100');
+         
+         var relSize = Math.max(0, Math.min(50, size));
+         var sc = mxShapeBasicRect2.prototype;
+         
+         c.setDashed(dashed);
+         
+         if (dashPattern && dashPattern != '')
+         {
+             c.setDashPattern(dashPattern);
+         }
+         
+         c.setStrokeWidth(strokeWidth);
+         
+         size = Math.min(h * 0.5, w * 0.5, size);
+         
+         if (!absoluteCornerSize)
+         {
+             size = relSize * Math.min(w, h) / 100;
+         }
+         
+         size = Math.min(size, Math.min(w, h) * 0.5);
+         
+         if (!absoluteCornerSize)
+         {
+             indent = Math.min(relIndent * Math.min(w, h) / 100);
+         }
+ 
+         indent = Math.min(indent, Math.min(w, h) * 0.5 - size);
+         
+         if ((top || right || bottom || left) && rectOutline != 'frame')
+         {
+             
+             //outline fill
+             c.begin();
+             if (!top)
+             {
+                 c.moveTo(0,0);
+             }
+             else
+             {
+                 sc.moveNW(c, x, y, w, h, rectStyle, topLeftStyle, size, left);
+             }
+             
+             if (top)
+             {
+                 sc.paintNW(c, x, y, w, h, rectStyle, topLeftStyle, size, left);
+             }
+ 
+             sc.paintTop(c, x, y, w, h, rectStyle, topRightStyle, size, right);
+             
+             if (right)
+             {
+                 sc.paintNE(c, x, y, w, h, rectStyle, topRightStyle, size, top);
+             }
+ 
+             sc.paintRight(c, x, y, w, h, rectStyle, bottomRightStyle, size, bottom);
+             
+             if (bottom)
+             {
+                 sc.paintSE(c, x, y, w, h, rectStyle, bottomRightStyle, size, right);
+             }
+             
+             sc.paintBottom(c, x, y, w, h, rectStyle, bottomLeftStyle, size, left);
+             
+             if (left)
+             {
+                 sc.paintSW(c, x, y, w, h, rectStyle, bottomLeftStyle, size, bottom);
+             }
+ 
+             sc.paintLeft(c, x, y, w, h, rectStyle, topLeftStyle, size, top);
+             c.close();
+             c.fill();
+ 
+             c.setShadow(false);
+ 
+             //inner fill
+             c.setFillColor(fillColor2);
+             var op1 = opacity;
+             var op2 = opacity;
+             
+             if (fillColor2 == 'none')
+             {
+                 op1 = 0;
+             }
+             
+             if (gradientColor2 == 'none')
+             {
+                 op2 = 0;
+             }
+             
+             c.setGradient(fillColor2, gradientColor2, 0, 0, w, h, gdir2, op1, op2);
+             
+             c.begin();
+ 
+             if (!top)
+             {
+                 c.moveTo(indent,0);
+             }
+             else
+             {
+                 sc.moveNWInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent, top, left);
+             }
+ 
+             sc.paintLeftInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, bottom, left);
+             
+             if (left && bottom)
+             {
+                 sc.paintSWInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, bottom);
+             }
+ 
+             sc.paintBottomInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent, right, bottom);
+             
+             if (bottom && right)
+             {
+                 sc.paintSEInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent);
+             }
+             
+             sc.paintRightInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent, top, right);
+             
+             if (right && top)
+             {
+                 sc.paintNEInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent);
+             }
+ 
+             sc.paintTopInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent, left, top);
+             
+             if (top && left)
+             {
+                 sc.paintNWInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent);
+             }
+ 
+             c.fill();
+ 
+             if (fillColor == 'none')
+             {
+                 c.begin();
+                 sc.paintFolds(c, x, y, w, h, rectStyle, topLeftStyle, topRightStyle, bottomRightStyle, bottomLeftStyle, size, top, right, bottom, left);
+                 c.stroke();
+             }
+         }
+ 
+         //draw all the combinations
+         if (!top && !right && !bottom && left)
+         {
+             
+             if (rectOutline != 'frame')
+             {
+                 c.begin();
+                 sc.moveSW(c, x, y, w, h, rectStyle, topLeftStyle, size, bottom);
+                 sc.paintLeft(c, x, y, w, h, rectStyle, topLeftStyle, size, top);
+ 
+                 if (rectOutline == 'double')
+                 {
+                     sc.moveNWInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent, top, left);
+                     sc.paintLeftInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, bottom, left);
+                 }
+                 
+                 c.stroke();
+             }
+             else
+             {
+                 c.begin();
+                 sc.moveSW(c, x, y, w, h, rectStyle, topLeftStyle, size, bottom);
+                 sc.paintLeft(c, x, y, w, h, rectStyle, topLeftStyle, size, top);
+                 sc.lineNWInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent, top, left);
+                 sc.paintLeftInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, bottom, left);
+                 c.close();
+                 c.fillAndStroke();
+             }
+         }
+         else if (!top && !right && bottom && !left)
+         {
+             if (rectOutline != 'frame')
+             {
+                 c.begin();
+                 sc.moveSE(c, x, y, w, h, rectStyle, bottomRightStyle, size, right);
+                 sc.paintBottom(c, x, y, w, h, rectStyle, bottomLeftStyle, size, left);
+         
+                 if (rectOutline == 'double')
+                 {
+                     sc.moveSWInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, left);
+                     sc.paintBottomInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent, right, bottom);
+                 }
+                 
+                 c.stroke();
+             }
+             else
+             {
+                 c.begin();
+                 sc.moveSE(c, x, y, w, h, rectStyle, bottomRightStyle, size, right);
+                 sc.paintBottom(c, x, y, w, h, rectStyle, bottomLeftStyle, size, left);
+                 sc.lineSWInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, left);
+                 sc.paintBottomInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent, right, bottom);
+                 c.close();
+                 c.fillAndStroke();
+             }
+         }
+         else if (!top && !right && bottom && left)
+         {
+             if (rectOutline != 'frame')
+             {
+                 c.begin();
+                 sc.moveSE(c, x, y, w, h, rectStyle, bottomRightStyle, size, right);
+                 sc.paintBottom(c, x, y, w, h, rectStyle, bottomLeftStyle, size, left);
+                 sc.paintSW(c, x, y, w, h, rectStyle, bottomLeftStyle, size, bottom);
+                 sc.paintLeft(c, x, y, w, h, rectStyle, topLeftStyle, size, top);
+         
+                 if (rectOutline == 'double')
+                 {
+                     sc.moveNWInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent, top, left);
+                     sc.paintLeftInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, bottom, left);
+                     sc.paintSWInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, bottom);
+                     sc.paintBottomInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent, right, bottom);
+                 }
+                 
+                 c.stroke();
+             }
+             else
+             {
+                 c.begin();
+                 sc.moveSE(c, x, y, w, h, rectStyle, bottomRightStyle, size, right);
+                 sc.paintBottom(c, x, y, w, h, rectStyle, bottomLeftStyle, size, left);
+                 sc.paintSW(c, x, y, w, h, rectStyle, bottomLeftStyle, size, bottom);
+                 sc.paintLeft(c, x, y, w, h, rectStyle, topLeftStyle, size, top);
+                 sc.lineNWInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent, top, left);
+                 sc.paintLeftInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, bottom, left);
+                 sc.paintSWInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, bottom);
+                 sc.paintBottomInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent, right, bottom);
+                 c.close();
+                 c.fillAndStroke();
+             }
+         }
+         else if (!top && right && !bottom && !left)
+         {
+             if (rectOutline != 'frame')
+             {
+                 c.begin();
+                 sc.moveNE(c, x, y, w, h, rectStyle, topRightStyle, size, top);
+                 sc.paintRight(c, x, y, w, h, rectStyle, bottomRightStyle, size, bottom);
+         
+                 if (rectOutline == 'double')
+                 {
+                     sc.moveSEInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent, bottom);
+                     sc.paintRightInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent, top, right);
+                 }
+                 
+                 c.stroke();
+             }
+             else
+             {
+                 c.begin();
+                 sc.moveNE(c, x, y, w, h, rectStyle, topRightStyle, size, top);
+                 sc.paintRight(c, x, y, w, h, rectStyle, bottomRightStyle, size, bottom);
+                 sc.lineSEInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent, bottom);
+                 sc.paintRightInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent, top, right);
+                 c.close();
+                 c.fillAndStroke();
+             }
+         }
+         else if (!top && right && !bottom && left)
+         {
+             if (rectOutline != 'frame')
+             {
+                 c.begin();
+                 sc.moveSW(c, x, y, w, h, rectStyle, topLeftStyle, size, bottom);
+                 sc.paintLeft(c, x, y, w, h, rectStyle, topLeftStyle, size, top);
+         
+                 if (rectOutline == 'double')
+                 {
+                     sc.moveNWInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent, top, left);
+                     sc.paintLeftInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, bottom, left);
+                 }
+                 
+                 c.stroke();
+                 
+                 c.begin();
+                 sc.moveNE(c, x, y, w, h, rectStyle, topRightStyle, size, top);
+                 sc.paintRight(c, x, y, w, h, rectStyle, bottomRightStyle, size, bottom);
+         
+                 if (rectOutline == 'double')
+                 {
+                     sc.moveSEInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent, bottom);
+                     sc.paintRightInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent, top, right);
+                 }
+                 
+                 c.stroke();
+             }
+             else
+             {
+                 c.begin();
+                 sc.moveSW(c, x, y, w, h, rectStyle, topLeftStyle, size, bottom);
+                 sc.paintLeft(c, x, y, w, h, rectStyle, topLeftStyle, size, top);
+                 sc.lineNWInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent, top, left);
+                 sc.paintLeftInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, bottom, left);
+                 c.close();
+                 c.fillAndStroke();
+                 
+                 c.begin();
+                 sc.moveNE(c, x, y, w, h, rectStyle, topRightStyle, size, top);
+                 sc.paintRight(c, x, y, w, h, rectStyle, bottomRightStyle, size, bottom);
+                 sc.lineSEInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent, bottom);
+                 sc.paintRightInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent, top, right);
+                 c.close();
+                 c.fillAndStroke();
+             }
+         }
+         else if (!top && right && bottom && !left)
+         {
+             if (rectOutline != 'frame')
+             {
+                 c.begin();
+                 sc.moveNE(c, x, y, w, h, rectStyle, topRightStyle, size, top);
+                 sc.paintRight(c, x, y, w, h, rectStyle, bottomRightStyle, size, bottom);
+                 sc.paintSE(c, x, y, w, h, rectStyle, bottomRightStyle, size, right);
+                 sc.paintBottom(c, x, y, w, h, rectStyle, bottomLeftStyle, size, left);
+ 
+                 if (rectOutline == 'double')
+                 {
+                     sc.moveSWInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, left);
+                     sc.paintBottomInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent, right, bottom);
+                     sc.paintSEInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent);
+                     sc.paintRightInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent, top, right);
+                 }
+                 
+                 c.stroke();
+             }
+             else
+             {
+                 c.begin();
+                 sc.moveNE(c, x, y, w, h, rectStyle, topRightStyle, size, top);
+                 sc.paintRight(c, x, y, w, h, rectStyle, bottomRightStyle, size, bottom);
+                 sc.paintSE(c, x, y, w, h, rectStyle, bottomRightStyle, size, right);
+                 sc.paintBottom(c, x, y, w, h, rectStyle, bottomLeftStyle, size, left);
+                 sc.lineSWInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, left);
+                 sc.paintBottomInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent, right, bottom);
+                 sc.paintSEInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent);
+                 sc.paintRightInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent, top, right);
+                 c.close();
+                 c.fillAndStroke();
+             }
+         }
+         else if (!top && right && bottom && left)
+         {
+             if (rectOutline != 'frame')
+             {
+                 c.begin();
+                 sc.moveNE(c, x, y, w, h, rectStyle, topRightStyle, size, top);
+                 sc.paintRight(c, x, y, w, h, rectStyle, bottomRightStyle, size, bottom);
+                 sc.paintSE(c, x, y, w, h, rectStyle, bottomRightStyle, size, right);
+                 sc.paintBottom(c, x, y, w, h, rectStyle, bottomLeftStyle, size, left);
+                 sc.paintSW(c, x, y, w, h, rectStyle, bottomLeftStyle, size, bottom);
+                 sc.paintLeft(c, x, y, w, h, rectStyle, topLeftStyle, size, top);
+         
+                 if (rectOutline == 'double')
+                 {
+                     sc.moveNWInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent, top, left);
+                     sc.paintLeftInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, bottom, left);
+                     sc.paintSWInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, bottom);
+                     sc.paintBottomInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent, right, bottom);
+                     sc.paintSEInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent);
+                     sc.paintRightInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent, top, right);
+                 }
+                 
+                 c.stroke();
+             }
+             else
+             {
+                 c.begin();
+                 sc.moveNE(c, x, y, w, h, rectStyle, topRightStyle, size, top);
+                 sc.paintRight(c, x, y, w, h, rectStyle, bottomRightStyle, size, bottom);
+                 sc.paintSE(c, x, y, w, h, rectStyle, bottomRightStyle, size, right);
+                 sc.paintBottom(c, x, y, w, h, rectStyle, bottomLeftStyle, size, left);
+                 sc.paintSW(c, x, y, w, h, rectStyle, bottomLeftStyle, size, bottom);
+                 sc.paintLeft(c, x, y, w, h, rectStyle, topLeftStyle, size, top);
+                 sc.lineNWInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent, top, left);
+                 sc.paintLeftInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, bottom, left);
+                 sc.paintSWInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, bottom);
+                 sc.paintBottomInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent, right, bottom);
+                 sc.paintSEInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent);
+                 sc.paintRightInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent, top, right);
+                 c.close();
+                 c.fillAndStroke();
+             }
+         }
+         else if (top && !right && !bottom && !left)
+         {
+             if (rectOutline != 'frame')
+             {
+                 c.begin();
+                 sc.moveNW(c, x, y, w, h, rectStyle, topLeftStyle, size, left);
+                 sc.paintTop(c, x, y, w, h, rectStyle, topRightStyle, size, right);
+         
+                 if (rectOutline == 'double')
+                 {
+                     sc.moveNEInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent, right);
+                     sc.paintTopInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent, left, top);
+                 }
+                 
+                 c.stroke();
+             }
+             else
+             {
+                 c.begin();
+                 sc.moveNW(c, x, y, w, h, rectStyle, topLeftStyle, size, left);
+                 sc.paintTop(c, x, y, w, h, rectStyle, topRightStyle, size, right);
+                 sc.lineNEInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent, right);
+                 sc.paintTopInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent, left, top);
+                 c.close();
+                 c.fillAndStroke();
+             }
+         }
+         else if (top && !right && !bottom && left)
+         {
+             if (rectOutline != 'frame')
+             {
+                 c.begin();
+                 sc.moveSW(c, x, y, w, h, rectStyle, bottomLeftStyle, size, bottom);
+                 sc.paintLeft(c, x, y, w, h, rectStyle, topLeftStyle, size, top);
+                 sc.paintNW(c, x, y, w, h, rectStyle, topLeftStyle, size, left);
+                 sc.paintTop(c, x, y, w, h, rectStyle, topRightStyle, size, right);
+         
+                 if (rectOutline == 'double')
+                 {
+                     sc.moveNEInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent, right);
+                     sc.paintTopInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent, left, top);
+                     sc.paintNWInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent);
+                     sc.paintLeftInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, bottom, left);
+                 }
+                 
+                 c.stroke();
+             }
+             else
+             {
+                 c.begin();
+                 sc.moveSW(c, x, y, w, h, rectStyle, bottomLeftStyle, size, bottom);
+                 sc.paintLeft(c, x, y, w, h, rectStyle, topLeftStyle, size, top);
+                 sc.paintNW(c, x, y, w, h, rectStyle, topLeftStyle, size, left);
+                 sc.paintTop(c, x, y, w, h, rectStyle, topRightStyle, size, right);
+                 sc.lineNEInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent, right);
+                 sc.paintTopInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent, left, top);
+                 sc.paintNWInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent);
+                 sc.paintLeftInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, bottom, left);
+                 c.close();
+                 c.fillAndStroke();
+             }
+         }
+         else if (top && !right && bottom && !left)
+         {
+             if (rectOutline != 'frame')
+             {
+                 c.begin();
+                 sc.moveNW(c, x, y, w, h, rectStyle, topLeftStyle, size, left);
+                 sc.paintTop(c, x, y, w, h, rectStyle, topRightStyle, size, right);
+         
+                 if (rectOutline == 'double')
+                 {
+                     sc.moveNEInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent, right);
+                     sc.paintTopInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent, left, top);
+                 }
+                 
+                 c.stroke();
+         
+                 c.begin();
+                 sc.moveSE(c, x, y, w, h, rectStyle, bottomRightStyle, size, right);
+                 sc.paintBottom(c, x, y, w, h, rectStyle, bottomLeftStyle, size, left);
+         
+                 if (rectOutline == 'double')
+                 {
+                     sc.moveSWInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, left);
+                     sc.paintBottomInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent, right, bottom);
+                 }
+                 
+                 c.stroke();
+             }
+             else
+             {
+                 c.begin();
+                 sc.moveNW(c, x, y, w, h, rectStyle, topLeftStyle, size, left);
+                 sc.paintTop(c, x, y, w, h, rectStyle, topRightStyle, size, right);
+                 sc.lineNEInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent, right);
+                 sc.paintTopInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent, left, top);
+                 c.close();
+                 c.fillAndStroke();
+         
+                 c.begin();
+                 sc.moveSE(c, x, y, w, h, rectStyle, bottomRightStyle, size, right);
+                 sc.paintBottom(c, x, y, w, h, rectStyle, bottomLeftStyle, size, left);
+                 sc.lineSWInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, left);
+                 sc.paintBottomInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent, right, bottom);
+                 c.close();
+                 c.fillAndStroke();
+             }
+         }
+         else if (top && !right && bottom && left)
+         {
+             if (rectOutline != 'frame')
+             {
+                 c.begin();
+                 sc.moveSE(c, x, y, w, h, rectStyle, bottomRightStyle, size, right);
+                 sc.paintBottom(c, x, y, w, h, rectStyle, bottomLeftStyle, size, left);
+                 sc.paintSW(c, x, y, w, h, rectStyle, bottomLeftStyle, size, bottom);
+                 sc.paintLeft(c, x, y, w, h, rectStyle, topLeftStyle, size, top);
+                 sc.paintNW(c, x, y, w, h, rectStyle, topLeftStyle, size, left);
+                 sc.paintTop(c, x, y, w, h, rectStyle, topRightStyle, size, right);
+         
+                 if (rectOutline == 'double')
+                 {
+                     sc.moveNEInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent, right);
+                     sc.paintTopInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent, left, top);
+                     sc.paintNWInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent);
+                     sc.paintLeftInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, bottom, left);
+                     sc.paintSWInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, bottom);
+                     sc.paintBottomInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent, right, bottom);
+                 }
+                 
+                 c.stroke();
+             }
+             else
+             {
+                 c.begin();
+                 sc.moveSE(c, x, y, w, h, rectStyle, bottomRightStyle, size, right);
+                 sc.paintBottom(c, x, y, w, h, rectStyle, bottomLeftStyle, size, left);
+                 sc.paintSW(c, x, y, w, h, rectStyle, bottomLeftStyle, size, bottom);
+                 sc.paintLeft(c, x, y, w, h, rectStyle, topLeftStyle, size, top);
+                 sc.paintNW(c, x, y, w, h, rectStyle, topLeftStyle, size, left);
+                 sc.paintTop(c, x, y, w, h, rectStyle, topRightStyle, size, right);
+                 sc.lineNEInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent, right);
+                 sc.paintTopInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent, left, top);
+                 sc.paintNWInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent);
+                 sc.paintLeftInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, bottom, left);
+                 sc.paintSWInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, bottom);
+                 sc.paintBottomInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent, right, bottom);
+                 c.close();
+                 c.fillAndStroke();
+             }
+         }
+         else if (top && right && !bottom && !left)
+         {
+             if (rectOutline != 'frame')
+             {
+                 c.begin();
+                 sc.moveNW(c, x, y, w, h, rectStyle, topLeftStyle, size, left);
+                 sc.paintTop(c, x, y, w, h, rectStyle, topRightStyle, size, right);
+                 sc.paintNE(c, x, y, w, h, rectStyle, topRightStyle, size, top);
+                 sc.paintRight(c, x, y, w, h, rectStyle, bottomRightStyle, size, bottom);
+         
+                 if (rectOutline == 'double')
+                 {
+                     sc.moveSEInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent, bottom);
+                     sc.paintRightInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent, top, right);
+                     sc.paintNEInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent);
+                     sc.paintTopInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent, left, top);
+                 }
+                 
+                 c.stroke();
+             }
+             else
+             {
+                 c.begin();
+                 sc.moveNW(c, x, y, w, h, rectStyle, topLeftStyle, size, left);
+                 sc.paintTop(c, x, y, w, h, rectStyle, topRightStyle, size, right);
+                 sc.paintNE(c, x, y, w, h, rectStyle, topRightStyle, size, top);
+                 sc.paintRight(c, x, y, w, h, rectStyle, bottomRightStyle, size, bottom);
+                 sc.lineSEInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent, bottom);
+                 sc.paintRightInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent, top, right);
+                 sc.paintNEInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent);
+                 sc.paintTopInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent, left, top);
+                 c.close();
+                 c.fillAndStroke();
+             }
+         }
+         else if (top && right && !bottom && left)
+         {
+             if (rectOutline != 'frame')
+             {
+                 c.begin();
+                 sc.moveSW(c, x, y, w, h, rectStyle, bottomLeftStyle, size, bottom);
+                 sc.paintLeft(c, x, y, w, h, rectStyle, topLeftStyle, size, top);
+                 sc.paintNW(c, x, y, w, h, rectStyle, topLeftStyle, size, left);
+                 sc.paintTop(c, x, y, w, h, rectStyle, topRightStyle, size, right);
+                 sc.paintNE(c, x, y, w, h, rectStyle, topRightStyle, size, top);
+                 sc.paintRight(c, x, y, w, h, rectStyle, bottomRightStyle, size, bottom);
+         
+                 if (rectOutline == 'double')
+                 {
+                     sc.moveSEInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent, bottom);
+                     sc.paintRightInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent, top, right);
+                     sc.paintNEInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent);
+                     sc.paintTopInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent, left, top);
+                     sc.paintNWInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent);
+                     sc.paintLeftInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, bottom, left);
+                 }
+                 
+                 c.stroke();
+             }
+             else
+             {
+                 c.begin();
+                 sc.moveSW(c, x, y, w, h, rectStyle, bottomLeftStyle, size, bottom);
+                 sc.paintLeft(c, x, y, w, h, rectStyle, topLeftStyle, size, top);
+                 sc.paintNW(c, x, y, w, h, rectStyle, topLeftStyle, size, left);
+                 sc.paintTop(c, x, y, w, h, rectStyle, topRightStyle, size, right);
+                 sc.paintNE(c, x, y, w, h, rectStyle, topRightStyle, size, top);
+                 sc.paintRight(c, x, y, w, h, rectStyle, bottomRightStyle, size, bottom);
+                 sc.lineSEInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent, bottom);
+                 sc.paintRightInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent, top, right);
+                 sc.paintNEInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent);
+                 sc.paintTopInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent, left, top);
+                 sc.paintNWInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent);
+                 sc.paintLeftInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, bottom, left);
+                 c.close();
+                 c.fillAndStroke();
+             }
+         }
+         else if (top && right && bottom && !left)
+         {
+             if (rectOutline != 'frame')
+             {
+                 c.begin();
+                 sc.moveNW(c, x, y, w, h, rectStyle, topLeftStyle, size, left);
+                 sc.paintTop(c, x, y, w, h, rectStyle, topRightStyle, size, right);
+                 sc.paintNE(c, x, y, w, h, rectStyle, topRightStyle, size, top);
+                 sc.paintRight(c, x, y, w, h, rectStyle, bottomRightStyle, size, bottom);
+                 sc.paintSE(c, x, y, w, h, rectStyle, bottomRightStyle, size, right);
+                 sc.paintBottom(c, x, y, w, h, rectStyle, bottomLeftStyle, size, left);
+         
+                 if (rectOutline == 'double')
+                 {
+                     sc.moveSWInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, left);
+                     sc.paintBottomInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent, right, bottom);
+                     sc.paintSEInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent);
+                     sc.paintRightInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent, top, right);
+                     sc.paintNEInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent);
+                     sc.paintTopInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent, left, top);
+                 }
+                 
+                 c.stroke();
+             }
+             else
+             {
+                 c.begin();
+                 sc.moveNW(c, x, y, w, h, rectStyle, topLeftStyle, size, left);
+                 sc.paintTop(c, x, y, w, h, rectStyle, topRightStyle, size, right);
+                 sc.paintNE(c, x, y, w, h, rectStyle, topRightStyle, size, top);
+                 sc.paintRight(c, x, y, w, h, rectStyle, bottomRightStyle, size, bottom);
+                 sc.paintSE(c, x, y, w, h, rectStyle, bottomRightStyle, size, right);
+                 sc.paintBottom(c, x, y, w, h, rectStyle, bottomLeftStyle, size, left);
+                 sc.lineSWInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, left);
+                 sc.paintBottomInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent, right, bottom);
+                 sc.paintSEInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent);
+                 sc.paintRightInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent, top, right);
+                 sc.paintNEInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent);
+                 sc.paintTopInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent, left, top);
+                 c.close();
+                 c.fillAndStroke();
+             }
+         }
+         else if (top && right && bottom && left)
+         {
+             if (rectOutline != 'frame')
+             {
+                 c.begin();
+                 sc.moveNW(c, x, y, w, h, rectStyle, topLeftStyle, size, left);
+                 sc.paintNW(c, x, y, w, h, rectStyle, topLeftStyle, size, left);
+                 sc.paintTop(c, x, y, w, h, rectStyle, topRightStyle, size, right);
+                 sc.paintNE(c, x, y, w, h, rectStyle, topRightStyle, size, top);
+                 sc.paintRight(c, x, y, w, h, rectStyle, bottomRightStyle, size, bottom);
+                 sc.paintSE(c, x, y, w, h, rectStyle, bottomRightStyle, size, right);
+                 sc.paintBottom(c, x, y, w, h, rectStyle, bottomLeftStyle, size, left);
+                 sc.paintSW(c, x, y, w, h, rectStyle, bottomLeftStyle, size, bottom);
+                 sc.paintLeft(c, x, y, w, h, rectStyle, topLeftStyle, size, top);
+                 c.close();
+                 
+                 if (rectOutline == 'double')
+                 {
+                     sc.moveSWInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, left);
+                     sc.paintSWInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, bottom);
+                     sc.paintBottomInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent, right, bottom);
+                     sc.paintSEInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent);
+                     sc.paintRightInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent, top, right);
+                     sc.paintNEInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent);
+                     sc.paintTopInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent, left, top);
+                     sc.paintNWInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent);
+                     sc.paintLeftInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, bottom, left);
+                     c.close();
+                 }
+                 
+                 c.stroke();
+             }
+             else
+             {
+                 c.begin();
+                 sc.moveNW(c, x, y, w, h, rectStyle, topLeftStyle, size, left);
+                 sc.paintNW(c, x, y, w, h, rectStyle, topLeftStyle, size, left);
+                 sc.paintTop(c, x, y, w, h, rectStyle, topRightStyle, size, right);
+                 sc.paintNE(c, x, y, w, h, rectStyle, topRightStyle, size, top);
+                 sc.paintRight(c, x, y, w, h, rectStyle, bottomRightStyle, size, bottom);
+                 sc.paintSE(c, x, y, w, h, rectStyle, bottomRightStyle, size, right);
+                 sc.paintBottom(c, x, y, w, h, rectStyle, bottomLeftStyle, size, left);
+                 sc.paintSW(c, x, y, w, h, rectStyle, bottomLeftStyle, size, bottom);
+                 sc.paintLeft(c, x, y, w, h, rectStyle, topLeftStyle, size, top);
+                 c.close();
+                 sc.moveSWInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, left);
+                 sc.paintSWInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, bottom);
+                 sc.paintBottomInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent, right, bottom);
+                 sc.paintSEInner(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent);
+                 sc.paintRightInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent, top, right);
+                 sc.paintNEInner(c, x, y, w, h, rectStyle, topRightStyle, size, indent);
+                 sc.paintTopInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent, left, top);
+                 sc.paintNWInner(c, x, y, w, h, rectStyle, topLeftStyle, size, indent);
+                 sc.paintLeftInner(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, bottom, left);
+                 c.close();
+                 c.fillAndStroke();
+             }
+         }
+ 
+         c.begin();
+         sc.paintFolds(c, x, y, w, h, rectStyle, topLeftStyle, topRightStyle, bottomRightStyle, bottomLeftStyle, size, top, right, bottom, left);
+         c.stroke();
+     };
+ 
+     mxShapeBasicRect2.prototype.moveNW = function(c, x, y, w, h, rectStyle, topLeftStyle, size, left)
+     {
+         if((topLeftStyle == 'square' || (topLeftStyle == 'default' && rectStyle == 'square' )) || !left)
+         {
+             c.moveTo(0, 0);
+         }
+         else
+         {
+             c.moveTo(0, size);
+         }
+     };
+ 
+     mxShapeBasicRect2.prototype.moveNE = function(c, x, y, w, h, rectStyle, topRightStyle, size, top)
+     {
+         if((topRightStyle == 'square' || (topRightStyle == 'default' && rectStyle == 'square' )) || !top)
+         {
+             c.moveTo(w, 0);
+         }
+         else
+         {
+             c.moveTo(w - size, 0);
+         }
+     };
+ 
+     mxShapeBasicRect2.prototype.moveSE = function(c, x, y, w, h, rectStyle, bottomRightStyle, size, right)
+     {
+         if((bottomRightStyle == 'square' || (bottomRightStyle == 'default' && rectStyle == 'square' )) || !right)
+         {
+             c.moveTo(w, h);
+         }
+         else
+         {
+             c.moveTo(w, h - size);
+         }
+     };
+ 
+     mxShapeBasicRect2.prototype.moveSW = function(c, x, y, w, h, rectStyle, bottomLeftStyle, size, bottom)
+     {
+         if((bottomLeftStyle == 'square' || (bottomLeftStyle == 'default' && rectStyle == 'square' )) || !bottom)
+         {
+             c.moveTo(0, h);
+         }
+         else
+         {
+             c.moveTo(size, h);
+         }
+     };
+ 
+     mxShapeBasicRect2.prototype.paintNW = function(c, x, y, w, h, rectStyle, topLeftStyle, size, left)
+     {
+         if (!left)
+         {
+             c.lineTo(0, 0);
+         }
+         else if((topLeftStyle == 'rounded' || (topLeftStyle == 'default' && rectStyle == 'rounded' )) ||
+                 (topLeftStyle == 'invRound' || (topLeftStyle == 'default' && rectStyle == 'invRound' )) )
+         {
+             var inv = 0;
+             
+             if (topLeftStyle == 'rounded' || (topLeftStyle == 'default' && rectStyle == 'rounded' ))
+             {
+                 inv = 1;
+             }
+             
+             c.arcTo(size, size, 0, 0, inv, size, 0);
+         }
+         else if((topLeftStyle == 'snip' || (topLeftStyle == 'default' && rectStyle == 'snip' )) ||
+                 (topLeftStyle == 'fold' || (topLeftStyle == 'default' && rectStyle == 'fold' )))
+         {
+             c.lineTo(size, 0);
+         }
+     };
+ 
+     mxShapeBasicRect2.prototype.paintTop = function(c, x, y, w, h, rectStyle, topRightStyle, size, right)
+     {
+         if((topRightStyle == 'square' || (topRightStyle == 'default' && rectStyle == 'square' )) || !right)
+         {
+             c.lineTo(w, 0);
+         }
+         else
+         {
+             c.lineTo(w - size, 0);
+         }
+     };
+ 
+     mxShapeBasicRect2.prototype.paintNE = function(c, x, y, w, h, rectStyle, topRightStyle, size, top)
+     {
+         if (!top)
+         {
+             c.lineTo(w, 0);
+         }
+         else if((topRightStyle == 'rounded' || (topRightStyle == 'default' && rectStyle == 'rounded' )) ||
+                 (topRightStyle == 'invRound' || (topRightStyle == 'default' && rectStyle == 'invRound' )) )
+         {
+             var inv = 0;
+             
+             if (topRightStyle == 'rounded' || (topRightStyle == 'default' && rectStyle == 'rounded' ))
+             {
+                 inv = 1;
+             }
+             
+             c.arcTo(size, size, 0, 0, inv, w, size);
+         }
+         else if((topRightStyle == 'snip' || (topRightStyle == 'default' && rectStyle == 'snip' )) ||
+                 (topRightStyle == 'fold' || (topRightStyle == 'default' && rectStyle == 'fold' )))
+         {
+             c.lineTo(w, size);
+         }
+     };
+ 
+     mxShapeBasicRect2.prototype.paintRight = function(c, x, y, w, h, rectStyle, bottomRightStyle, size, bottom)
+     {
+         if((bottomRightStyle == 'square' || (bottomRightStyle == 'default' && rectStyle == 'square' )) || !bottom)
+         {
+             c.lineTo(w, h);
+         }
+         else
+         {
+             c.lineTo(w, h - size);
+         }
+     };
+ 
+     mxShapeBasicRect2.prototype.paintLeft = function(c, x, y, w, h, rectStyle, topLeftStyle, size, top)
+     {
+         if((topLeftStyle == 'square' || (topLeftStyle == 'default' && rectStyle == 'square' )) || !top)
+         {
+             c.lineTo(0, 0);
+         }
+         else
+         {
+             c.lineTo(0, size);
+         }
+     };
+ 
+     mxShapeBasicRect2.prototype.paintSE = function(c, x, y, w, h, rectStyle, bottomRightStyle, size, right)
+     {
+         if (!right)
+         {
+             c.lineTo(w, h);
+         }
+         else if((bottomRightStyle == 'rounded' || (bottomRightStyle == 'default' && rectStyle == 'rounded' )) ||
+                 (bottomRightStyle == 'invRound' || (bottomRightStyle == 'default' && rectStyle == 'invRound' )) )
+         {
+             var inv = 0;
+             
+             if (bottomRightStyle == 'rounded' || (bottomRightStyle == 'default' && rectStyle == 'rounded' ))
+             {
+                 inv = 1;
+             }
+             
+             c.arcTo(size, size, 0, 0, inv, w - size, h);
+         }
+         else if((bottomRightStyle == 'snip' || (bottomRightStyle == 'default' && rectStyle == 'snip' )) ||
+                 (bottomRightStyle == 'fold' || (bottomRightStyle == 'default' && rectStyle == 'fold' )))
+         {
+             c.lineTo(w - size, h);
+         }
+     };
+ 
+     mxShapeBasicRect2.prototype.paintBottom = function(c, x, y, w, h, rectStyle, bottomLeftStyle, size, left)
+     {
+         if((bottomLeftStyle == 'square' || (bottomLeftStyle == 'default' && rectStyle == 'square' )) || !left)
+         {
+             c.lineTo(0, h);
+         }
+         else
+         {
+             c.lineTo(size, h);
+         }
+     };
+ 
+     mxShapeBasicRect2.prototype.paintSW = function(c, x, y, w, h, rectStyle, bottomLeftStyle, size, bottom)
+     {
+         if (!bottom)
+         {
+             c.lineTo(0, h);
+         }
+         else if((bottomLeftStyle == 'rounded' || (bottomLeftStyle == 'default' && rectStyle == 'rounded' )) ||
+                 (bottomLeftStyle == 'invRound' || (bottomLeftStyle == 'default' && rectStyle == 'invRound' )) )
+         {
+             var inv = 0;
+             
+             if (bottomLeftStyle == 'rounded' || (bottomLeftStyle == 'default' && rectStyle == 'rounded' ))
+             {
+                 inv = 1;
+             }
+             
+             c.arcTo(size, size, 0, 0, inv, 0, h - size);
+         }
+         else if((bottomLeftStyle == 'snip' || (bottomLeftStyle == 'default' && rectStyle == 'snip' )) ||
+                 (bottomLeftStyle == 'fold' || (bottomLeftStyle == 'default' && rectStyle == 'fold' )))
+         {
+             c.lineTo(0, h - size);
+         }
+     };
+ 
+     mxShapeBasicRect2.prototype.paintNWInner = function(c, x, y, w, h, rectStyle, topLeftStyle, size, indent)
+     {
+         if(topLeftStyle == 'rounded' || (topLeftStyle == 'default' && rectStyle == 'rounded' ))
+         {
+             c.arcTo(size - indent * 0.5, size - indent * 0.5, 0, 0, 0, indent, indent * 0.5 + size);
+         }
+         else if(topLeftStyle == 'invRound' || (topLeftStyle == 'default' && rectStyle == 'invRound' ))
+         {
+             c.arcTo(size + indent, size + indent, 0, 0, 1, indent, indent + size);
+         }
+         else if(topLeftStyle == 'snip' || (topLeftStyle == 'default' && rectStyle == 'snip' ))
+         {
+             c.lineTo(indent, indent * 0.5 + size);
+         }
+         else if(topLeftStyle == 'fold' || (topLeftStyle == 'default' && rectStyle == 'fold' ))
+         {
+             c.lineTo(indent + size, indent + size);
+             c.lineTo(indent, indent + size);
+         }
+     };
+ 
+     mxShapeBasicRect2.prototype.paintTopInner = function(c, x, y, w, h, rectStyle, topLeftStyle, size, indent, left, top)
+     {
+         if (!left && !top)
+         {
+             c.lineTo(0, 0);
+         }
+         else if (!left && top)
+         {
+             c.lineTo(0, indent);
+         }
+         else if (left && !top)
+         {
+             c.lineTo(indent, 0);
+         }
+         else if (!left)
+         {
+             c.lineTo(0, indent);
+         }
+         else if(topLeftStyle == 'square' || (topLeftStyle == 'default' && rectStyle == 'square' ))
+         {
+             c.lineTo(indent, indent);
+         }
+         else if((topLeftStyle == 'rounded' || (topLeftStyle == 'default' && rectStyle == 'rounded' )) ||
+                 (topLeftStyle == 'snip' || (topLeftStyle == 'default' && rectStyle == 'snip' )))
+         {
+             c.lineTo(size + indent * 0.5, indent);
+         }
+         else
+         {
+             c.lineTo(size + indent, indent);
+         }
+     };
+ 
+     mxShapeBasicRect2.prototype.paintNEInner = function(c, x, y, w, h, rectStyle, topRightStyle, size, indent)
+     {
+         if(topRightStyle == 'rounded' || (topRightStyle == 'default' && rectStyle == 'rounded' ))
+         {
+             c.arcTo(size - indent * 0.5, size - indent * 0.5, 0, 0, 0, w - size - indent * 0.5, indent);
+         }
+         else if(topRightStyle == 'invRound' || (topRightStyle == 'default' && rectStyle == 'invRound' ))
+         {
+             c.arcTo(size + indent, size + indent, 0, 0, 1, w - size - indent, indent);
+         }
+         else if(topRightStyle == 'snip' || (topRightStyle == 'default' && rectStyle == 'snip' ))
+         {
+             c.lineTo(w - size - indent * 0.5, indent);
+         }
+         else if(topRightStyle == 'fold' || (topRightStyle == 'default' && rectStyle == 'fold' ))
+         {
+             c.lineTo(w - size - indent, size + indent);
+             c.lineTo(w - size - indent, indent);
+         }
+     };
+ 
+     mxShapeBasicRect2.prototype.paintRightInner = function(c, x, y, w, h, rectStyle, topRightStyle, size, indent, top, right)
+     {
+         if (!top && !right)
+         {
+             c.lineTo(w, 0);
+         }
+         else if (!top && right)
+         {
+             c.lineTo(w - indent, 0);
+         }
+         else if (top && !right)
+         {
+             c.lineTo(w, indent);
+         }
+         else if (!top)
+         {
+             c.lineTo(w - indent, 0);
+         }
+         else if(topRightStyle == 'square' || (topRightStyle == 'default' && rectStyle == 'square' ))
+         {
+             c.lineTo(w - indent, indent);
+         }
+         else if((topRightStyle == 'rounded' || (topRightStyle == 'default' && rectStyle == 'rounded' )) ||
+                 (topRightStyle == 'snip' || (topRightStyle == 'default' && rectStyle == 'snip' )))
+         {
+             c.lineTo(w - indent, size + indent * 0.5);
+         }
+         else
+         {
+             c.lineTo(w - indent, size + indent);
+         }
+     };
+ 
+     mxShapeBasicRect2.prototype.paintLeftInner = function(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, bottom, left)
+     {
+         if (!bottom && !left)
+         {
+             c.lineTo(0, h);
+         }
+         else if (!bottom && left)
+         {
+             c.lineTo(indent, h);
+         }
+         else if (bottom && !left)
+         {
+             c.lineTo(0, h - indent);
+         }
+         else if (!bottom)
+         {
+             c.lineTo(indent, h);
+         }
+         else if(bottomLeftStyle == 'square' || (bottomLeftStyle == 'default' && rectStyle == 'square' ))
+         {
+             c.lineTo(indent, h - indent);
+         }
+         else if((bottomLeftStyle == 'rounded' || (bottomLeftStyle == 'default' && rectStyle == 'rounded' )) ||
+                 (bottomLeftStyle == 'snip' || (bottomLeftStyle == 'default' && rectStyle == 'snip' )))
+         {
+             c.lineTo(indent, h - size - indent * 0.5);
+         }
+         else
+         {
+             c.lineTo(indent, h - size - indent);
+         }
+     };
+ 
+     mxShapeBasicRect2.prototype.paintSEInner = function(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent)
+     {
+         if(bottomRightStyle == 'rounded' || (bottomRightStyle == 'default' && rectStyle == 'rounded' ))
+         {
+             c.arcTo(size - indent * 0.5, size - indent * 0.5, 0, 0, 0, w - indent, h - size - indent * 0.5);
+         }
+         else if(bottomRightStyle == 'invRound' || (bottomRightStyle == 'default' && rectStyle == 'invRound' ))
+         {
+             c.arcTo(size + indent, size + indent, 0, 0, 1, w - indent, h - size - indent);
+         }
+         else if(bottomRightStyle == 'snip' || (bottomRightStyle == 'default' && rectStyle == 'snip' ))
+         {
+             c.lineTo(w - indent, h - size - indent * 0.5);
+         }
+         else if(bottomRightStyle == 'fold' || (bottomRightStyle == 'default' && rectStyle == 'fold' ))
+         {
+             c.lineTo(w - size - indent, h - size - indent);
+             c.lineTo(w - indent, h - size - indent);
+         }
+     };
+ 
+     mxShapeBasicRect2.prototype.paintBottomInner = function(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent, right, bottom)
+     {
+         if (!right && !bottom)
+         {
+             c.lineTo(w, h);
+         }
+         else if (!right && bottom)
+         {
+             c.lineTo(w, h - indent);
+         }
+         else if (right && !bottom)
+         {
+             c.lineTo(w - indent, h);
+         }
+         else if((bottomRightStyle == 'square' || (bottomRightStyle == 'default' && rectStyle == 'square' )) || !right)
+         {
+             c.lineTo(w - indent, h - indent);
+         }
+         else if((bottomRightStyle == 'rounded' || (bottomRightStyle == 'default' && rectStyle == 'rounded' )) ||
+                 (bottomRightStyle == 'snip' || (bottomRightStyle == 'default' && rectStyle == 'snip' )))
+         {
+             c.lineTo(w - size - indent * 0.5, h - indent);
+         }
+         else
+         {
+             c.lineTo(w - size - indent, h - indent);
+         }
+     };
+ 
+     mxShapeBasicRect2.prototype.paintSWInner = function(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, bottom)
+     {
+         if (!bottom)
+         {
+             c.lineTo(indent, h);
+         }
+         else if(bottomLeftStyle == 'square' || (bottomLeftStyle == 'default' && rectStyle == 'square' ))
+         {
+             c.lineTo(indent, h - indent);
+         }
+         else if(bottomLeftStyle == 'rounded' || (bottomLeftStyle == 'default' && rectStyle == 'rounded' ))
+         {
+             c.arcTo(size - indent * 0.5, size - indent * 0.5, 0, 0, 0, size + indent * 0.5, h - indent);
+         }
+         else if(bottomLeftStyle == 'invRound' || (bottomLeftStyle == 'default' && rectStyle == 'invRound' ))
+         {
+             c.arcTo(size + indent, size + indent, 0, 0, 1, size + indent, h - indent);
+         }
+         else if(bottomLeftStyle == 'snip' || (bottomLeftStyle == 'default' && rectStyle == 'snip' ))
+         {
+             c.lineTo(size + indent * 0.5, h - indent);
+         }
+         else if(bottomLeftStyle == 'fold' || (bottomLeftStyle == 'default' && rectStyle == 'fold' ))
+         {
+             c.lineTo(indent + size, h - size - indent);
+             c.lineTo(indent + size, h - indent);
+         }
+     };
+ 
+     mxShapeBasicRect2.prototype.moveSWInner = function(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, left)
+     {
+         if (!left)
+         {
+             c.moveTo(0, h - indent);
+         }
+         else if(bottomLeftStyle == 'square' || (bottomLeftStyle == 'default' && rectStyle == 'square' ))
+         {
+             c.moveTo(indent, h - indent);
+         }
+         else if((bottomLeftStyle == 'rounded' || (bottomLeftStyle == 'default' && rectStyle == 'rounded' )) ||
+                 (bottomLeftStyle == 'snip' || (bottomLeftStyle == 'default' && rectStyle == 'snip' )))
+         {
+             c.moveTo(indent, h - size - indent * 0.5);
+         }
+         else if((bottomLeftStyle == 'invRound' || (bottomLeftStyle == 'default' && rectStyle == 'invRound' )) ||
+                 (bottomLeftStyle == 'fold' || (bottomLeftStyle == 'default' && rectStyle == 'fold' )))
+         {
+             c.moveTo(indent, h - size - indent);
+         }
+     };
+ 
+     mxShapeBasicRect2.prototype.lineSWInner = function(c, x, y, w, h, rectStyle, bottomLeftStyle, size, indent, left)
+     {
+         if (!left)
+         {
+             c.lineTo(0, h - indent);
+         }
+         else if(bottomLeftStyle == 'square' || (bottomLeftStyle == 'default' && rectStyle == 'square' ))
+         {
+             c.lineTo(indent, h - indent);
+         }
+         else if((bottomLeftStyle == 'rounded' || (bottomLeftStyle == 'default' && rectStyle == 'rounded' )) ||
+                 (bottomLeftStyle == 'snip' || (bottomLeftStyle == 'default' && rectStyle == 'snip' )))
+         {
+             c.lineTo(indent, h - size - indent * 0.5);
+         }
+         else if((bottomLeftStyle == 'invRound' || (bottomLeftStyle == 'default' && rectStyle == 'invRound' )) ||
+                 (bottomLeftStyle == 'fold' || (bottomLeftStyle == 'default' && rectStyle == 'fold' )))
+         {
+                 c.lineTo(indent, h - size - indent);
+         }
+     };
+ 
+     mxShapeBasicRect2.prototype.moveSEInner = function(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent, bottom)
+     {
+         if (!bottom)
+         {
+             c.moveTo(w - indent, h);
+         }
+         else if(bottomRightStyle == 'square' || (bottomRightStyle == 'default' && rectStyle == 'square' ))
+         {
+             c.moveTo(w - indent, h - indent);
+         }
+         else if((bottomRightStyle == 'rounded' || (bottomRightStyle == 'default' && rectStyle == 'rounded' )) ||
+                 (bottomRightStyle == 'snip' || (bottomRightStyle == 'default' && rectStyle == 'snip' )))
+         {
+             c.moveTo(w - indent, h - size - indent * 0.5);
+         }
+         else if((bottomRightStyle == 'invRound' || (bottomRightStyle == 'default' && rectStyle == 'invRound' )) ||
+                 (bottomRightStyle == 'fold' || (bottomRightStyle == 'default' && rectStyle == 'fold' )))
+         {
+             c.moveTo(w - indent, h - size - indent);
+         }
+     };
+ 
+     mxShapeBasicRect2.prototype.lineSEInner = function(c, x, y, w, h, rectStyle, bottomRightStyle, size, indent, bottom)
+     {
+         if (!bottom)
+         {
+             c.lineTo(w - indent, h);
+         }
+         else if(bottomRightStyle == 'square' || (bottomRightStyle == 'default' && rectStyle == 'square' ))
+         {
+             c.lineTo(w - indent, h - indent);
+         }
+         else if((bottomRightStyle == 'rounded' || (bottomRightStyle == 'default' && rectStyle == 'rounded' )) ||
+                 (bottomRightStyle == 'snip' || (bottomRightStyle == 'default' && rectStyle == 'snip' )))
+         {
+             c.lineTo(w - indent, h - size - indent * 0.5);
+         }
+         else if((bottomRightStyle == 'invRound' || (bottomRightStyle == 'default' && rectStyle == 'invRound' )) ||
+                 (bottomRightStyle == 'fold' || (bottomRightStyle == 'default' && rectStyle == 'fold' )))
+         {
+             c.lineTo(w - indent, h - size - indent);
+         }
+     };
+ 
+     mxShapeBasicRect2.prototype.moveNEInner = function(c, x, y, w, h, rectStyle, topRightStyle, size, indent, right)
+     {
+         if (!right)
+         {
+             c.moveTo(w, indent);
+         }
+         else if((topRightStyle == 'square' || (topRightStyle == 'default' && rectStyle == 'square' )) || right)
+         {
+             c.moveTo(w - indent, indent);
+         }
+         else if((topRightStyle == 'rounded' || (topRightStyle == 'default' && rectStyle == 'rounded' )) ||
+                 (topRightStyle == 'snip' || (topRightStyle == 'default' && rectStyle == 'snip' )))
+         {
+             c.moveTo(w - indent, size + indent * 0.5);
+         }
+         else if((topRightStyle == 'invRound' || (topRightStyle == 'default' && rectStyle == 'invRound' )) ||
+                 (topRightStyle == 'fold' || (topRightStyle == 'default' && rectStyle == 'fold' )))
+         {
+             c.moveTo(w - indent, size + indent);
+         }
+     };
+ 
+     mxShapeBasicRect2.prototype.lineNEInner = function(c, x, y, w, h, rectStyle, topRightStyle, size, indent, right)
+     {
+         if (!right)
+         {
+             c.lineTo(w, indent);
+         }
+         else if((topRightStyle == 'square' || (topRightStyle == 'default' && rectStyle == 'square' )) || right)
+         {
+             c.lineTo(w - indent, indent);
+         }
+         else if((topRightStyle == 'rounded' || (topRightStyle == 'default' && rectStyle == 'rounded' )) ||
+                 (topRightStyle == 'snip' || (topRightStyle == 'default' && rectStyle == 'snip' )))
+         {
+             c.lineTo(w - indent, size + indent * 0.5);
+         }
+         else if((topRightStyle == 'invRound' || (topRightStyle == 'default' && rectStyle == 'invRound' )) ||
+                 (topRightStyle == 'fold' || (topRightStyle == 'default' && rectStyle == 'fold' )))
+         {
+             c.lineTo(w - indent, size + indent);
+         }
+     };
+ 
+     mxShapeBasicRect2.prototype.moveNWInner = function(c, x, y, w, h, rectStyle, topLeftStyle, size, indent, top, left)
+     {
+         if (!top && !left)
+         {
+             c.moveTo(0, 0);
+         }
+         else if (!top && left)
+         {
+             c.moveTo(indent, 0);
+         }
+         else if (top && !left)
+         {
+             c.moveTo(0, indent);
+         }
+         else if(topLeftStyle == 'square' || (topLeftStyle == 'default' && rectStyle == 'square' ))
+         {
+             c.moveTo(indent, indent);
+         }
+         else if((topLeftStyle == 'rounded' || (topLeftStyle == 'default' && rectStyle == 'rounded' )) ||
+                 (topLeftStyle == 'snip' || (topLeftStyle == 'default' && rectStyle == 'snip' )))
+         {
+             c.moveTo(indent, size + indent * 0.5);
+         }
+         else if((topLeftStyle == 'invRound' || (topLeftStyle == 'default' && rectStyle == 'invRound' )) ||
+                 (topLeftStyle == 'fold' || (topLeftStyle == 'default' && rectStyle == 'fold' )))
+         {
+             c.moveTo(indent, size + indent);
+         }
+     };
+ 
+     mxShapeBasicRect2.prototype.lineNWInner = function(c, x, y, w, h, rectStyle, topLeftStyle, size, indent, top, left)
+     {
+         if (!top && !left)
+         {
+             c.lineTo(0, 0);
+         }
+         else if (!top && left)
+         {
+             c.lineTo(indent, 0);
+         }
+         else if (top && !left)
+         {
+             c.lineTo(0, indent);
+         }
+         else if(topLeftStyle == 'square' || (topLeftStyle == 'default' && rectStyle == 'square' ))
+         {
+             c.lineTo(indent, indent);
+         }
+         else if((topLeftStyle == 'rounded' || (topLeftStyle == 'default' && rectStyle == 'rounded' )) ||
+                 (topLeftStyle == 'snip' || (topLeftStyle == 'default' && rectStyle == 'snip' )))
+         {
+             c.lineTo(indent, size + indent * 0.5);
+         }
+         else if((topLeftStyle == 'invRound' || (topLeftStyle == 'default' && rectStyle == 'invRound' )) ||
+                 (topLeftStyle == 'fold' || (topLeftStyle == 'default' && rectStyle == 'fold' )))
+         {
+             c.lineTo(indent, size + indent);
+         }
+     };
+ 
+     mxShapeBasicRect2.prototype.paintFolds = function(c, x, y, w, h, rectStyle, topLeftStyle, topRightStyle, bottomRightStyle, bottomLeftStyle, size, top, right, bottom, left)
+     {
+         if (rectStyle == 'fold' || topLeftStyle == 'fold' || topRightStyle == 'fold' || bottomRightStyle == 'fold' || bottomLeftStyle == 'fold')
+         {
+             if ((topLeftStyle == 'fold' || (topLeftStyle == 'default' && rectStyle == 'fold' )) && (top && left))
+             {
+                 c.moveTo(0, size);
+                 c.lineTo(size, size);
+                 c.lineTo(size, 0);
+             }
+             
+             if ((topRightStyle == 'fold' || (topRightStyle == 'default' && rectStyle == 'fold' )) && (top && right))
+             {
+                 c.moveTo(w - size, 0);
+                 c.lineTo(w - size, size);
+                 c.lineTo(w, size);
+             }
+             
+             if ((bottomRightStyle == 'fold' || (bottomRightStyle == 'default' && rectStyle == 'fold' )) && (bottom && right))
+             {
+                 c.moveTo(w - size, h);
+                 c.lineTo(w - size, h - size);
+                 c.lineTo(w, h - size);
+             }
+             
+             if ((bottomLeftStyle == 'fold' || (bottomLeftStyle == 'default' && rectStyle == 'fold' )) && (bottom && left))
+             {
+                 c.moveTo(0, h - size);
+                 c.lineTo(size, h - size);
+                 c.lineTo(size, h);
+             }
+         }
+     };
+ 
+     mxCellRenderer.registerShape(mxShapeBasicRect2.prototype.cst.RECT2, mxShapeBasicRect2);
+ 
+     mxShapeBasicRect2.prototype.constraints = null;
+ 
      // FilledEdge shape
      function FilledEdge()
      {
@@ -3050,15 +5307,20 @@
      // Handlers are only added if mxVertexHandler is defined (ie. not in embedded graph)
      if (typeof mxVertexHandler !== 'undefined')
      {
-         function createHandle(state, keys, getPositionFn, setPositionFn, ignoreGrid, redrawEdges)
+         function createHandle(state, keys, getPositionFn, setPositionFn, ignoreGrid, redrawEdges, executeFn)
          {
              var handle = new mxHandle(state, null, mxVertexHandler.prototype.secondaryHandleImage);
              
-             handle.execute = function()
+             handle.execute = function(me)
              {
                  for (var i = 0; i < keys.length; i++)
                  {	
                      this.copyStyle(keys[i]);
+                 }
+                 
+                 if (executeFn)
+                 {
+                     executeFn(me);
                  }
              };
              
@@ -3135,19 +5397,25 @@
              };
          };
          
-         function createTrapezoidHandleFunction(max)
+         function createTrapezoidHandleFunction(max, defaultValue, fixedDefaultValue)
          {
+             max = (max != null) ? max : 0.5;
+             
              return function(state)
              {
                  var handles = [createHandle(state, ['size'], function(bounds)
                  {
-                     var size = Math.max(0, Math.min(max, parseFloat(mxUtils.getValue(this.state.style, 'size', TrapezoidShape.prototype.size))));
-                 
-                     return new mxPoint(bounds.x + size * bounds.width * 0.75, bounds.y + bounds.height / 4);
+                     var fixed = (fixedDefaultValue != null) ? mxUtils.getValue(this.state.style, 'fixedSize', '0') != '0' : null;
+                     var size = Math.max(0, parseFloat(mxUtils.getValue(this.state.style, 'size', (fixed) ? fixedDefaultValue : defaultValue)));
+                     
+                     return new mxPoint(bounds.x + Math.min(bounds.width * 0.75 * max, size * ((fixed) ? 0.75 : bounds.width * 0.75)), bounds.y + bounds.height / 4);
                  }, function(bounds, pt)
                  {
-                     this.state.style['size'] = Math.max(0, Math.min(max, (pt.x - bounds.x) / (bounds.width * 0.75)));
-                 }, null, true)];
+                     var fixed = (fixedDefaultValue != null) ? mxUtils.getValue(this.state.style, 'fixedSize', '0') != '0' : null;
+                     var size = (fixed) ? (pt.x - bounds.x) : Math.max(0, Math.min(max, (pt.x - bounds.x) / bounds.width * 0.75));
+                     
+                     this.state.style['size'] = size;
+                 }, false, true)];
                  
                  if (mxUtils.getValue(state.style, mxConstants.STYLE_ROUNDED, false))
                  {
@@ -3160,7 +5428,7 @@
          
          function createDisplayHandleFunction(defaultValue, allowArcHandle, max, redrawEdges, fixedDefaultValue)
          {
-             max = (max != null) ? max : 1;
+             max = (max != null) ? max : 0.5;
              
              return function(state)
              {
@@ -3169,19 +5437,14 @@
                      var fixed = (fixedDefaultValue != null) ? mxUtils.getValue(this.state.style, 'fixedSize', '0') != '0' : null;
                      var size = parseFloat(mxUtils.getValue(this.state.style, 'size', (fixed) ? fixedDefaultValue : defaultValue));
      
-                     return new mxPoint(bounds.x + Math.max(0, Math.min(bounds.width, size * ((fixed) ? 1 : bounds.width))), bounds.getCenterY());
+                     return new mxPoint(bounds.x + Math.max(0, Math.min(bounds.width * 0.5, size * ((fixed) ? 1 : bounds.width))), bounds.getCenterY());
                  }, function(bounds, pt, me)
                  {
                      var fixed = (fixedDefaultValue != null) ? mxUtils.getValue(this.state.style, 'fixedSize', '0') != '0' : null;
                      var size = (fixed) ? (pt.x - bounds.x) : Math.max(0, Math.min(max, (pt.x - bounds.x) / bounds.width));
                      
-                     if (fixed && !mxEvent.isAltDown(me.getEvent()))
-                     {
-                         size = state.view.graph.snap(size);
-                     }
-                     
                      this.state.style['size'] = size;
-                 }, null, redrawEdges)];
+                 }, false, redrawEdges)];
                  
                  if (allowArcHandle && mxUtils.getValue(state.style, mxConstants.STYLE_ROUNDED, false))
                  {
@@ -3206,7 +5469,7 @@
                  {
                      this.state.style['size'] = Math.round(Math.max(0, Math.min(Math.min(bounds.width, pt.x - bounds.x),
                              Math.min(bounds.height, pt.y - bounds.y))) / factor);
-                 })];
+                 }, false)];
                  
                  if (allowArcHandle && mxUtils.getValue(state.style, mxConstants.STYLE_ROUNDED, false))
                  {
@@ -3215,6 +5478,22 @@
                  
                  return handles;
              };
+         };
+         
+         function createCylinderHandleFunction(defaultValue)
+         {
+             return function(state)
+             {
+                 return [createHandle(state, ['size'], function(bounds)
+                         {
+                             var size = Math.max(0, Math.min(bounds.height * 0.5, parseFloat(mxUtils.getValue(this.state.style, 'size', defaultValue))));
+     
+                             return new mxPoint(bounds.x, bounds.y + size);
+                         }, function(bounds, pt)
+                         {
+                             this.state.style['size'] = Math.max(0, pt.y - bounds.y);
+                         }, true)];
+             }
          };
          
          function createArrowHandleFunction(maxSize)
@@ -3454,7 +5733,16 @@
              },
              'swimlane': function(state)
              {
-                 var handles = [createHandle(state, [mxConstants.STYLE_STARTSIZE], function(bounds)
+                 var handles = [];
+                 
+                 if (mxUtils.getValue(state.style, mxConstants.STYLE_ROUNDED))
+                 {
+                     var size = parseFloat(mxUtils.getValue(state.style, mxConstants.STYLE_STARTSIZE, mxConstants.DEFAULT_STARTSIZE));
+                     handles.push(createArcHandle(state, size / 2));
+                 }
+                 
+                 // Start size handle must be last item in handles for hover to work in tables (see mouse event handler in Graph)
+                 handles.push(createHandle(state, [mxConstants.STYLE_STARTSIZE], function(bounds)
                  {
                      var size = parseFloat(mxUtils.getValue(state.style, mxConstants.STYLE_STARTSIZE, mxConstants.DEFAULT_STARTSIZE));
                      
@@ -3472,13 +5760,35 @@
                          (mxUtils.getValue(this.state.style, mxConstants.STYLE_HORIZONTAL, 1) == 1) ?
                              Math.round(Math.max(0, Math.min(bounds.height, pt.y - bounds.y))) :
                              Math.round(Math.max(0, Math.min(bounds.width, pt.x - bounds.x)));
-                 })];
-                 
-                 if (mxUtils.getValue(state.style, mxConstants.STYLE_ROUNDED))
+                 }, false, null, function(me)
                  {
-                     var size = parseFloat(mxUtils.getValue(state.style, mxConstants.STYLE_STARTSIZE, mxConstants.DEFAULT_STARTSIZE));
-                     handles.push(createArcHandle(state, size / 2));
-                 }
+                     if (mxEvent.isControlDown(me.getEvent()))
+                     {
+                         var graph = state.view.graph;
+                         
+                         if (graph.isTableRow(state.cell) || graph.isTableCell(state.cell))
+                         {
+                             var dir = graph.getSwimlaneDirection(state.style);
+                             var parent = graph.model.getParent(state.cell);
+                             var cells = graph.model.getChildCells(parent, true);
+                             var temp = []; 
+                             
+                             for (var i = 0; i < cells.length; i++)
+                             {
+                                 // Finds siblings with the same direction and to set start size
+                                 if (cells[i] != state.cell && graph.isSwimlane(cells[i]) &&
+                                     graph.getSwimlaneDirection(graph.getCurrentCellStyle(
+                                     cells[i])) == dir)
+                                 {
+                                     temp.push(cells[i]);
+                                 }
+                             }
+                             
+                             graph.setCellStyles(mxConstants.STYLE_STARTSIZE,
+                                 state.style[mxConstants.STYLE_STARTSIZE], temp);
+                         }
+                     }					
+                 }));
                  
                  return handles;
              },
@@ -3519,13 +5829,17 @@
              {
                  var handles = [createHandle(state, ['size'], function(bounds)
                  {
-                     var size = Math.max(0, Math.min(0.5, parseFloat(mxUtils.getValue(this.state.style, 'size', ProcessShape.prototype.size))));
- 
-                     return new mxPoint(bounds.x + bounds.width * size, bounds.y + bounds.height / 4);
+                     
+                     var fixed = mxUtils.getValue(this.state.style, 'fixedSize', '0') != '0';
+                     var size = parseFloat(mxUtils.getValue(this.state.style, 'size', ProcessShape.prototype.size));
+                     
+                     return (fixed) ? new mxPoint(bounds.x + size, bounds.y + bounds.height / 4) : new mxPoint(bounds.x + bounds.width * size, bounds.y + bounds.height / 4);
                  }, function(bounds, pt)
                  {
-                     this.state.style['size'] = Math.max(0, Math.min(0.5, (pt.x - bounds.x) / bounds.width));
-                 })];
+                     var fixed = mxUtils.getValue(this.state.style, 'fixedSize', '0') != '0';
+                     var size = (fixed) ? Math.max(0, Math.min(bounds.width * 0.5, (pt.x - bounds.x))) : Math.max(0, Math.min(0.5, (pt.x - bounds.x) / bounds.width));
+                     this.state.style['size'] = size;
+                 }, false)];
                  
                  if (mxUtils.getValue(state.style, mxConstants.STYLE_ROUNDED, false))
                  {
@@ -3563,6 +5877,20 @@
                              Math.min(bounds.height, pt.y - bounds.y))));
                  })];
              },
+             'note2': function(state)
+             {
+                 return [createHandle(state, ['size'], function(bounds)
+                 {
+                     var size = Math.max(0, Math.min(bounds.width, Math.min(bounds.height, parseFloat(
+                         mxUtils.getValue(this.state.style, 'size', NoteShape2.prototype.size)))));
+                     
+                     return new mxPoint(bounds.x + bounds.width - size, bounds.y + size);
+                 }, function(bounds, pt)
+                 {
+                     this.state.style['size'] = Math.round(Math.max(0, Math.min(Math.min(bounds.width, bounds.x + bounds.width - pt.x),
+                             Math.min(bounds.height, pt.y - bounds.y))));
+                 })];
+             },
              'manualInput': function(state)
              {
                  var handles = [createHandle(state, ['size'], function(bounds)
@@ -3573,7 +5901,7 @@
                  }, function(bounds, pt)
                  {
                      this.state.style['size'] = Math.round(Math.max(0, Math.min(bounds.height, (pt.y - bounds.y) * 4 / 3)));
-                 })];
+                 }, false)];
                  
                  if (mxUtils.getValue(state.style, mxConstants.STYLE_ROUNDED, false))
                  {
@@ -3586,13 +5914,17 @@
              {
                  return [createHandle(state, ['size'], function(bounds)
                  {
-                     var size = Math.max(0, Math.min(1, parseFloat(mxUtils.getValue(this.state.style, 'size', DataStorageShape.prototype.size))));
+                     var fixed = mxUtils.getValue(this.state.style, 'fixedSize', '0') != '0';
+                     var size = parseFloat(mxUtils.getValue(this.state.style, 'size', (fixed) ? DataStorageShape.prototype.fixedSize : DataStorageShape.prototype.size));
  
-                     return new mxPoint(bounds.x + (1 - size) * bounds.width, bounds.getCenterY());
+                     return new mxPoint(bounds.x + bounds.width - size * ((fixed) ? 1 : bounds.width), bounds.getCenterY());
                  }, function(bounds, pt)
                  {
-                     this.state.style['size'] = Math.max(0, Math.min(1, (bounds.x + bounds.width - pt.x) / bounds.width));
-                 })];
+                     var fixed = mxUtils.getValue(this.state.style, 'fixedSize', '0') != '0';
+                     var size = (fixed) ? Math.max(0, Math.min(bounds.width, (bounds.x + bounds.width - pt.x))) : Math.max(0, Math.min(1, (bounds.x + bounds.width - pt.x) / bounds.width));
+                     
+                     this.state.style['size'] = size;
+                 }, false)];
              },
              'callout': function(state)
              {
@@ -3608,7 +5940,7 @@
                      var base = Math.max(0, Math.min(bounds.width, mxUtils.getValue(this.state.style, 'base', CalloutShape.prototype.base)));
                      this.state.style['size'] = Math.round(Math.max(0, Math.min(bounds.height, bounds.y + bounds.height - pt.y)));
                      this.state.style['position'] = Math.round(Math.max(0, Math.min(1, (pt.x - bounds.x) / bounds.width)) * 100) / 100;
-                 }), createHandle(state, ['position2'], function(bounds)
+                 }, false), createHandle(state, ['position2'], function(bounds)
                  {
                      var position2 = Math.max(0, Math.min(1, mxUtils.getValue(this.state.style, 'position2', CalloutShape.prototype.position2)));
  
@@ -3616,7 +5948,7 @@
                  }, function(bounds, pt)
                  {
                      this.state.style['position2'] = Math.round(Math.max(0, Math.min(1, (pt.x - bounds.x) / bounds.width)) * 100) / 100;
-                 }), createHandle(state, ['base'], function(bounds)
+                 }, false), createHandle(state, ['base'], function(bounds)
                  {
                      var size = Math.max(0, Math.min(bounds.height, mxUtils.getValue(this.state.style, 'size', CalloutShape.prototype.size)));
                      var position = Math.max(0, Math.min(1, mxUtils.getValue(this.state.style, 'position', CalloutShape.prototype.position)));
@@ -3628,7 +5960,7 @@
                      var position = Math.max(0, Math.min(1, mxUtils.getValue(this.state.style, 'position', CalloutShape.prototype.position)));
  
                      this.state.style['base'] = Math.round(Math.max(0, Math.min(bounds.width, pt.x - bounds.x - position * bounds.width)));
-                 })];
+                 }, false)];
                  
                  if (mxUtils.getValue(state.style, mxConstants.STYLE_ROUNDED, false))
                  {
@@ -3649,7 +5981,7 @@
                  {
                      this.state.style['dx'] = Math.round(Math.max(0, Math.min(bounds.width, pt.x - bounds.x)));
                      this.state.style['dy'] = Math.round(Math.max(0, Math.min(bounds.height, pt.y - bounds.y)));
-                 })];
+                 }, false)];
                  
                  if (mxUtils.getValue(state.style, mxConstants.STYLE_ROUNDED, false))
                  {
@@ -3686,7 +6018,7 @@
                  {
                      this.state.style['dx'] = Math.round(Math.max(0, Math.min(bounds.width, pt.x - bounds.x)));
                      this.state.style['dy'] = Math.round(Math.max(0, Math.min(bounds.height, pt.y - bounds.y)));
-                 })];
+                 }, false)];
              },
              'tee': function(state)
              {
@@ -3700,7 +6032,7 @@
                  {
                      this.state.style['dx'] = Math.round(Math.max(0, Math.min(bounds.width / 2, (pt.x - bounds.x - bounds.width / 2)) * 2));
                      this.state.style['dy'] = Math.round(Math.max(0, Math.min(bounds.height, pt.y - bounds.y)));
-                 })];
+                 }, false)];
              },
              'singleArrow': createArrowHandleFunction(1),
              'doubleArrow': createArrowHandleFunction(0.5),			
@@ -3728,7 +6060,7 @@
                      
                      this.state.style['tabWidth'] = Math.round(tw);
                      this.state.style['tabHeight'] = Math.round(Math.max(0, Math.min(bounds.height, pt.y - bounds.y)));
-                 })];
+                 }, false)];
              },
              'document': function(state)
              {
@@ -3740,7 +6072,7 @@
                  }, function(bounds, pt)
                  {
                      this.state.style['size'] = Math.max(0, Math.min(1, (bounds.y + bounds.height - pt.y) / bounds.height));
-                 })];
+                 }, false)];
              },
              'tape': function(state)
              {
@@ -3752,8 +6084,23 @@
                  }, function(bounds, pt)
                  {
                      this.state.style['size'] = Math.max(0, Math.min(1, ((pt.y - bounds.y) / bounds.height) * 2));
-                 })];
+                 }, false)];
              },
+             'isoCube2' : function(state)
+             {
+                 return [createHandle(state, ['isoAngle'], function(bounds)
+                 {
+                     var isoAngle = Math.max(0.01, Math.min(94, parseFloat(mxUtils.getValue(this.state.style, 'isoAngle', IsoCubeShape2.isoAngle)))) * Math.PI / 200 ;
+                     var isoH = Math.min(bounds.width * Math.tan(isoAngle), bounds.height * 0.5);
+ 
+                     return new mxPoint(bounds.x, bounds.y + isoH);
+                 }, function(bounds, pt)
+                 {
+                     this.state.style['isoAngle'] = Math.max(0, (pt.y - bounds.y) * 50 / bounds.height);
+                 }, true)];
+             },
+             'cylinder2' : createCylinderHandleFunction(CylinderShape.prototype.size),
+             'cylinder3' : createCylinderHandleFunction(CylinderShape3.prototype.size),
              'offPageConnector': function(state)
              {
                  return [createHandle(state, ['size'], function(bounds)
@@ -3764,25 +6111,55 @@
                  }, function(bounds, pt)
                  {
                      this.state.style['size'] = Math.max(0, Math.min(1, (bounds.y + bounds.height - pt.y) / bounds.height));
+                 }, false)];
+             },
+             'mxgraph.basic.rect': function(state)
+             {
+                 var handles = [Graph.createHandle(state, ['size'], function(bounds)
+                 {
+                     var size = Math.max(0, Math.min(bounds.width / 2, bounds.height / 2, parseFloat(mxUtils.getValue(this.state.style, 'size', this.size))));
+         
+                     return new mxPoint(bounds.x + size, bounds.y + size);
+                 }, function(bounds, pt)
+                 {
+                     this.state.style['size'] = Math.round(100 * Math.max(0, Math.min(bounds.height / 2, bounds.width / 2, pt.x - bounds.x))) / 100;
                  })];
+                         
+                 var handle2 = Graph.createHandle(state, ['indent'], function(bounds)
+                 {
+                     var dx2 = Math.max(0, Math.min(100, parseFloat(mxUtils.getValue(this.state.style, 'indent', this.dx2))));
+         
+                     return new mxPoint(bounds.x + bounds.width * 0.75, bounds.y + dx2 * bounds.height / 200);
+                 }, function(bounds, pt)
+                 {
+                     this.state.style['indent'] = Math.round(100 * Math.max(0, Math.min(100, 200 * (pt.y - bounds.y) / bounds.height))) / 100;
+                 });
+                 
+                 handles.push(handle2);
+                 
+                 return handles;
              },
              'step': createDisplayHandleFunction(StepShape.prototype.size, true, null, true, StepShape.prototype.fixedSize),
-             'hexagon': createDisplayHandleFunction(HexagonShape.prototype.size, true, 0.5, true),
+             'hexagon': createDisplayHandleFunction(HexagonShape.prototype.size, true, 0.5, true, HexagonShape.prototype.fixedSize),
              'curlyBracket': createDisplayHandleFunction(CurlyBracketShape.prototype.size, false),
              'display': createDisplayHandleFunction(DisplayShape.prototype.size, false),
              'cube': createCubeHandleFunction(1, CubeShape.prototype.size, false),
              'card': createCubeHandleFunction(0.5, CardShape.prototype.size, true),
              'loopLimit': createCubeHandleFunction(0.5, LoopLimitShape.prototype.size, true),
-             'trapezoid': createTrapezoidHandleFunction(0.5),
-             'parallelogram': createTrapezoidHandleFunction(1)
+             'trapezoid': createTrapezoidHandleFunction(0.5, TrapezoidShape.prototype.size, TrapezoidShape.prototype.fixedSize),
+             'parallelogram': createTrapezoidHandleFunction(1, ParallelogramShape.prototype.size, ParallelogramShape.prototype.fixedSize)
          };
          
          // Exposes custom handles
          Graph.createHandle = createHandle;
          Graph.handleFactory = handleFactory;
  
+         var vertexHandlerCreateCustomHandles = mxVertexHandler.prototype.createCustomHandles;
+ 
          mxVertexHandler.prototype.createCustomHandles = function()
          {
+             var handles = vertexHandlerCreateCustomHandles.apply(this, arguments);
+             
              if (this.graph.isCellRotatable(this.state.cell))
              // LATER: Make locked state independent of rotatable flag, fix toggle if default is false
              //if (this.graph.isCellResizable(this.state.cell) || this.graph.isCellMovable(this.state.cell))
@@ -3794,6 +6171,10 @@
                  {
                      name = mxConstants.SHAPE_RECTANGLE;
                  }
+                 else if (this.state.view.graph.isSwimlane(this.state.cell))
+                 {
+                     name = mxConstants.SHAPE_SWIMLANE;
+                 }
                  
                  var fn = handleFactory[name];
                  
@@ -3804,11 +6185,23 @@
              
                  if (fn != null)
                  {
-                     return fn(this.state);
+                     var temp = fn(this.state);
+                     
+                     if (temp != null)
+                     {
+                         if (handles == null)
+                         {
+                             handles = temp;
+                         }
+                         else
+                         {
+                             handles = handles.concat(temp);
+                         }
+                     }
                  }
              }
              
-             return null;
+             return handles;
          };
  
          mxEdgeHandler.prototype.createCustomHandles = function()
@@ -3837,7 +6230,7 @@
          Graph.createHandle = function() {};
          Graph.handleFactory = {};
      }
-      
+ 
       var isoHVector = new mxPoint(1, 0);
       var isoVVector = new mxPoint(1, 0);
          
@@ -3977,6 +6370,24 @@
          return (constr);
      };
  
+     IsoCubeShape2.prototype.getConstraints = function(style, w, h)
+     {
+         var constr = [];
+         var isoAngle = Math.max(0.01, Math.min(94, parseFloat(mxUtils.getValue(this.style, 'isoAngle', this.isoAngle)))) * Math.PI / 200 ;
+         var isoH = Math.min(w * Math.tan(isoAngle), h * 0.5);
+         
+         constr.push(new mxConnectionConstraint(new mxPoint(0.5, 0), false));
+         constr.push(new mxConnectionConstraint(new mxPoint(0, 0), false, null, w, isoH));
+         constr.push(new mxConnectionConstraint(new mxPoint(1, 0.5), false));
+         constr.push(new mxConnectionConstraint(new mxPoint(0, 0), false, null, w, h - isoH));
+         constr.push(new mxConnectionConstraint(new mxPoint(0.5, 1), false));
+         constr.push(new mxConnectionConstraint(new mxPoint(0, 0), false, null, 0, h - isoH));
+         constr.push(new mxConnectionConstraint(new mxPoint(0, 0.5), false));
+         constr.push(new mxConnectionConstraint(new mxPoint(0, 0), false, null, 0, isoH));
+ 
+         return (constr);
+     }
+     
      CalloutShape.prototype.getConstraints = function(style, w, h)
      {
          var constr = [];
@@ -4025,11 +6436,12 @@
                                         new mxConnectionConstraint(new mxPoint(0, 1), true), new mxConnectionConstraint(new mxPoint(1, 1), true),
                                         new mxConnectionConstraint(new mxPoint(0.5, 0), true), new mxConnectionConstraint(new mxPoint(0.5, 1), true),
                                             new mxConnectionConstraint(new mxPoint(0, 0.5), true), new mxConnectionConstraint(new mxPoint(1, 0.5))];
-     mxLabel.prototype.constraints = mxRectangleShape.prototype.constraints;
+     PartialRectangleShape.prototype.constraints = mxRectangleShape.prototype.constraints;
      mxImageShape.prototype.constraints = mxRectangleShape.prototype.constraints;
      mxSwimlane.prototype.constraints = mxRectangleShape.prototype.constraints;
      PlusShape.prototype.constraints = mxRectangleShape.prototype.constraints;
- 
+     mxLabel.prototype.constraints = mxRectangleShape.prototype.constraints;
+     
      NoteShape.prototype.getConstraints = function(style, w, h)
      {
          var constr = [];
@@ -4095,6 +6507,34 @@
          constr.push(new mxConnectionConstraint(new mxPoint(0, 0), false, null, s * 0.5, h - s * 0.5));
          constr.push(new mxConnectionConstraint(new mxPoint(0, 0), false, null, 0, h - s));
          constr.push(new mxConnectionConstraint(new mxPoint(0, 0), false, null, 0, (h - s) * 0.5));
+         
+         return (constr);
+     };
+     
+     CylinderShape3.prototype.getConstraints = function(style, w, h)
+     {
+         var constr = [];
+         var s = Math.max(0, Math.min(h, parseFloat(mxUtils.getValue(this.style, 'size', this.size))));
+         
+         constr.push(new mxConnectionConstraint(new mxPoint(0.5, 0), false));
+         constr.push(new mxConnectionConstraint(new mxPoint(0, 0.5), false));
+         constr.push(new mxConnectionConstraint(new mxPoint(0.5, 1), false));
+         constr.push(new mxConnectionConstraint(new mxPoint(1, 0.5), false));
+         
+         constr.push(new mxConnectionConstraint(new mxPoint(0, 0), false, null, 0, s));
+         constr.push(new mxConnectionConstraint(new mxPoint(1, 0), false, null, 0, s));
+         constr.push(new mxConnectionConstraint(new mxPoint(1, 1), false, null, 0, -s));
+         constr.push(new mxConnectionConstraint(new mxPoint(0, 1), false, null, 0, -s));
+         
+         constr.push(new mxConnectionConstraint(new mxPoint(0, 0), false, null, 0, s + (h * 0.5 - s) * 0.5));
+         constr.push(new mxConnectionConstraint(new mxPoint(1, 0), false, null, 0, s + (h * 0.5 - s) * 0.5));
+         constr.push(new mxConnectionConstraint(new mxPoint(1, 0), false, null, 0, h - s - (h * 0.5 - s) * 0.5));
+         constr.push(new mxConnectionConstraint(new mxPoint(0, 0), false, null, 0, h - s - (h * 0.5 - s) * 0.5));
+ 
+         constr.push(new mxConnectionConstraint(new mxPoint(0.145, 0), false, null, 0, s * 0.29));
+         constr.push(new mxConnectionConstraint(new mxPoint(0.855, 0), false, null, 0, s * 0.29));
+         constr.push(new mxConnectionConstraint(new mxPoint(0.855, 1), false, null, 0, -s * 0.29));
+         constr.push(new mxConnectionConstraint(new mxPoint(0.145, 1), false, null, 0, -s * 0.29));
          
          return (constr);
      };
@@ -4482,4 +6922,3 @@
      ProvidedRequiredInterfaceShape.prototype.constraints = [new mxConnectionConstraint(new mxPoint(0, 0.5), false),
          new mxConnectionConstraint(new mxPoint(1, 0.5), false)];
  })();
- 

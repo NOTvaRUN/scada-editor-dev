@@ -1,0 +1,31 @@
+{
+  "name": "y",
+  "version": "1.0.0",
+  "description": "dev branch for scada editor npm package.",
+  "main": "GruntFile.js",
+  "dependencies": {
+    "grunt-contrib-uglify": "^5.0.1",
+    "homedir-polyfill": "^1.0.3",
+    "os-homedir": "^1.0.2",
+    "os-tmpdir": "^1.0.2",
+    "osenv": "^0.1.5",
+    "parse-passwd": "^1.0.0"
+  },
+  "devDependencies": {
+    "grunt": "^1.4.1",
+    "grunt-contrib-jshint": "^3.0.0"
+  },
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/NOTvaRUN/scada-editor-dev.git"
+  },
+  "author": "",
+  "license": "ISC",
+  "bugs": {
+    "url": "https://github.com/NOTvaRUN/scada-editor-dev/issues"
+  },
+  "homepage": "https://github.com/NOTvaRUN/scada-editor-dev#readme"
+}

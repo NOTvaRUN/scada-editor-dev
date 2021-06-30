@@ -520,3 +520,645 @@ Toolbar.prototype.addMenuHandler = function(a, b, c, h) {
 Toolbar.prototype.destroy = function() {
     null != this.gestureHandler && (mxEvent.removeGestureListeners(document, this.gestureHandler), this.gestureHandler = null)
 };
+
+Editor.createRoughCanvas = function(c)
+{
+    var rc = rough.canvas(
+    {
+        // Provides expected function but return value is not used
+        getContext: function()
+        {
+            return c;
+        }
+    });
+    
+    rc.draw = function(drawable)
+    {
+        var sets = drawable.sets || [];
+        var o = drawable.options || this.getDefaultOptions();
+
+        for (var i = 0; i < sets.length; i++)
+        {
+            var drawing = sets[i];
+            
+            switch (drawing.type)
+            {
+                case 'path':
+                    if (o.stroke != null)
+                    {
+                        this._drawToContext(c, drawing, o);
+                    }
+                    break;
+                case 'fillPath':
+                    this._drawToContext(c, drawing, o);
+                    break;
+                case 'fillSketch':
+                    this.fillSketch(c, drawing, o);
+                    break;
+            }
+        }
+    };
+
+    rc.fillSketch = function(ctx, drawing, o)
+    {
+        var strokeColor = c.state.strokeColor;
+        var strokeWidth = c.state.strokeWidth;
+        var strokeAlpha = c.state.strokeAlpha;
+        var dashed = c.state.dashed;
+        
+        var fweight = o.fillWeight;
+        if (fweight < 0)
+        {
+            fweight = o.strokeWidth / 2;
+        }
+
+        c.setStrokeAlpha(c.state.fillAlpha);
+        c.setStrokeColor(o.fill || '');
+        c.setStrokeWidth(fweight);
+        c.setDashed(false);
+        
+        this._drawToContext(ctx, drawing, o);
+        
+        c.setDashed(dashed);
+        c.setStrokeWidth(strokeWidth);
+        c.setStrokeColor(strokeColor);
+        c.setStrokeAlpha(strokeAlpha);
+    };
+
+    rc._drawToContext = function(ctx, drawing, o)
+    {
+        ctx.begin();
+        
+        for (var i = 0; i < drawing.ops.length; i++)
+        {
+            var item = drawing.ops[i];
+            var data = item.data;
+            
+            switch (item.op)
+            {
+                case 'move':
+                    ctx.moveTo(data[0], data[1]);
+                    break;
+                case 'bcurveTo':
+                    ctx.curveTo(data[0], data[1], data[2], data[3], data[4], data[5]);
+                    break;
+                case 'lineTo':
+                    ctx.lineTo(data[0], data[1]);
+                    break;
+            }
+        };
+
+        ctx.end();
+
+        if (drawing.type === 'fillPath' && o.filled)
+        {
+            ctx.fill();
+        }
+        else
+        {
+            ctx.stroke();
+        }
+    };
+
+    return rc;
+};
+
+
+(function()
+{	
+    function RoughCanvas(canvas, rc, shape)
+    {
+        this.canvas = canvas;
+        this.rc = rc;
+        this.shape = shape;
+        
+        // Avoids "spikes" in the output
+        this.canvas.setLineJoin('round');
+        this.canvas.setLineCap('round');
+        
+        this.originalBegin = this.canvas.begin;
+        this.canvas.begin = mxUtils.bind(this, RoughCanvas.prototype.begin);
+        
+        this.originalEnd = this.canvas.end;
+        this.canvas.end = mxUtils.bind(this, RoughCanvas.prototype.end);
+                
+        this.originalRect = this.canvas.rect;
+        this.canvas.rect = mxUtils.bind(this, RoughCanvas.prototype.rect);
+
+        this.originalRoundrect = this.canvas.roundrect;
+        this.canvas.roundrect = mxUtils.bind(this, RoughCanvas.prototype.roundrect);
+        
+        this.originalEllipse = this.canvas.ellipse;
+        this.canvas.ellipse = mxUtils.bind(this, RoughCanvas.prototype.ellipse);
+        
+        this.originalLineTo = this.canvas.lineTo;
+        this.canvas.lineTo = mxUtils.bind(this, RoughCanvas.prototype.lineTo);
+        
+        this.originalMoveTo = this.canvas.moveTo;
+        this.canvas.moveTo = mxUtils.bind(this, RoughCanvas.prototype.moveTo);
+        
+        this.originalQuadTo = this.canvas.quadTo;
+        this.canvas.quadTo = mxUtils.bind(this, RoughCanvas.prototype.quadTo);
+        
+        this.originalCurveTo = this.canvas.curveTo;
+        this.canvas.curveTo = mxUtils.bind(this, RoughCanvas.prototype.curveTo);
+        
+        this.originalArcTo = this.canvas.arcTo;
+        this.canvas.arcTo = mxUtils.bind(this, RoughCanvas.prototype.arcTo);
+        
+        this.originalClose = this.canvas.close;
+        this.canvas.close = mxUtils.bind(this, RoughCanvas.prototype.close);
+        
+        this.originalFill = this.canvas.fill;
+        this.canvas.fill = mxUtils.bind(this, RoughCanvas.prototype.fill);
+        
+        this.originalStroke = this.canvas.stroke;
+        this.canvas.stroke = mxUtils.bind(this, RoughCanvas.prototype.stroke);
+        
+        this.originalFillAndStroke = this.canvas.fillAndStroke;
+        this.canvas.fillAndStroke = mxUtils.bind(this, RoughCanvas.prototype.fillAndStroke);
+        
+        this.path = [];
+        this.passThrough = false;
+    };
+
+    RoughCanvas.prototype.moveOp = 'M';
+    RoughCanvas.prototype.lineOp = 'L';
+    RoughCanvas.prototype.quadOp = 'Q';
+    RoughCanvas.prototype.curveOp = 'C';
+    RoughCanvas.prototype.closeOp = 'Z';
+
+    RoughCanvas.prototype.getStyle = function(stroke, fill)
+    {
+        // Random seed created from cell ID
+        var seed = 1;
+
+        if (this.shape.state != null)
+        {
+            var str = this.shape.state.cell.id;
+            
+            if (str != null)
+            {
+                for (var i = 0; i < str.length; i++)
+                {
+                    seed = ((seed << 5) - seed + str.charCodeAt(i)) << 0;
+                }
+            }
+        }
+
+        var style = {strokeWidth: this.canvas.state.strokeWidth, seed: seed, preserveVertices: true};
+        var defs = this.rc.getDefaultOptions();
+        
+        if (stroke)
+        {
+            style.stroke = this.canvas.state.strokeColor === 'none' ? 'transparent' : this.canvas.state.strokeColor;
+        }
+        else
+        {
+            delete style.stroke;
+        }
+        
+        var gradient = null;
+        style.filled = fill;
+        
+        if (fill)
+        {
+            style.fill = this.canvas.state.fillColor === 'none' ? '' : this.canvas.state.fillColor;
+            gradient = this.canvas.state.gradientColor === 'none' ? null : this.canvas.state.gradientColor;
+        }
+        else
+        {
+            style.fill = '';
+        }
+        
+        // Applies cell style
+        style['bowing'] = mxUtils.getValue(this.shape.style, 'bowing', defs['bowing']);
+        style['hachureAngle'] = mxUtils.getValue(this.shape.style, 'hachureAngle', defs['hachureAngle']);
+        style['curveFitting'] = mxUtils.getValue(this.shape.style, 'curveFitting', defs['curveFitting']);
+        style['roughness'] = mxUtils.getValue(this.shape.style, 'jiggle', defs['roughness']);
+        style['simplification'] = mxUtils.getValue(this.shape.style, 'simplification', defs['simplification']);
+        style['disableMultiStroke'] = mxUtils.getValue(this.shape.style, 'disableMultiStroke', defs['disableMultiStroke']);
+        style['disableMultiStrokeFill'] = mxUtils.getValue(this.shape.style, 'disableMultiStrokeFill', defs['disableMultiStrokeFill']);
+    
+        var hachureGap = mxUtils.getValue(this.shape.style, 'hachureGap', -1);
+        style['hachureGap'] = (hachureGap == 'auto') ? -1 : hachureGap;
+        style['dashGap'] = mxUtils.getValue(this.shape.style, 'dashGap', hachureGap);
+        style['dashOffset'] = mxUtils.getValue(this.shape.style, 'dashOffset', hachureGap);
+        style['zigzagOffset'] = mxUtils.getValue(this.shape.style, 'zigzagOffset', hachureGap);
+        
+        var fillWeight = mxUtils.getValue(this.shape.style, 'fillWeight', -1);
+        style['fillWeight'] = (fillWeight == 'auto') ? -1 : fillWeight;
+        
+        var fillStyle = mxUtils.getValue(this.shape.style, 'fillStyle', 'auto');
+        
+        if (fillStyle == 'auto')
+        {
+            var bg = (this.shape.state != null) ? this.shape.state.view.graph.defaultPageBackgroundColor : '#ffffff';
+            
+            fillStyle = (style.fill != null && (gradient != null || (bg != null &&
+                style.fill.toLowerCase() == bg.toLowerCase()))) ? 'solid' : defs['fillStyle']
+        }
+        
+        style['fillStyle'] = fillStyle;
+        
+        return style;
+    };
+    
+    RoughCanvas.prototype.begin = function()
+    {
+        if (this.passThrough)
+        {
+            this.originalBegin.apply(this.canvas, arguments);
+        }
+        else
+        {
+            this.path = [];
+        }
+    };
+    
+    RoughCanvas.prototype.end = function()
+    {
+        if (this.passThrough)
+        {
+            this.originalEnd.apply(this.canvas, arguments);
+        }
+        else
+        {
+            // do nothing
+        }
+    };
+    
+    RoughCanvas.prototype.addOp = function()
+    {
+        if (this.path != null)
+        {
+            this.path.push(arguments[0]);
+            
+            if (arguments.length > 2)
+            {
+                var s = this.canvas.state;
+    
+                for (var i = 2; i < arguments.length; i += 2)
+                {
+                    this.lastX = arguments[i - 1];
+                    this.lastY = arguments[i];
+                    
+                    this.path.push(this.canvas.format((this.lastX)));
+                    this.path.push(this.canvas.format((this.lastY)));
+                }
+            }
+        }
+    };
+
+    RoughCanvas.prototype.lineTo = function(endX, endY)
+    {
+        if (this.passThrough)
+        {
+            this.originalLineTo.apply(this.canvas, arguments);
+        }
+        else
+        {
+            this.addOp(this.lineOp, endX, endY);
+            this.lastX = endX;
+            this.lastY = endY;
+        }
+    };
+    
+    RoughCanvas.prototype.moveTo = function(endX, endY)
+    {
+        if (this.passThrough)
+        {
+            this.originalMoveTo.apply(this.canvas, arguments);
+        }
+        else
+        {
+            this.addOp(this.moveOp, endX, endY);
+            this.lastX = endX;
+            this.lastY = endY;
+            this.firstX = endX;
+            this.firstY = endY;
+        }
+    };
+    
+    RoughCanvas.prototype.close = function()
+    {
+        if (this.passThrough)
+        {
+            this.originalClose.apply(this.canvas, arguments);
+        }
+        else
+        {
+            this.addOp(this.closeOp);
+        }
+    };
+    
+    RoughCanvas.prototype.quadTo = function(x1, y1, x2, y2)
+    {
+        if (this.passThrough)
+        {
+            this.originalQuadTo.apply(this.canvas, arguments);
+        }
+        else
+        {
+            this.addOp(this.quadOp, x1, y1, x2, y2);
+            this.lastX = x2;
+            this.lastY = y2;
+        }
+    };
+    
+    RoughCanvas.prototype.curveTo = function(x1, y1, x2, y2, x3, y3)
+    {
+        if (this.passThrough)
+        {
+            this.originalCurveTo.apply(this.canvas, arguments);
+        }
+        else
+        {
+            this.addOp(this.curveOp, x1, y1, x2, y2, x3, y3);
+            this.lastX = x3;
+            this.lastY = y3;
+        }
+    };
+    
+    RoughCanvas.prototype.arcTo = function(rx, ry, angle, largeArcFlag, sweepFlag, x, y)
+    {
+        if (this.passThrough)
+        {
+            this.originalArcTo.apply(this.canvas, arguments);
+        }
+        else
+        {
+            var curves = mxUtils.arcToCurves(this.lastX, this.lastY, rx, ry, angle, largeArcFlag, sweepFlag, x, y);
+            
+            if (curves != null)
+            {
+                for (var i = 0; i < curves.length; i += 6) 
+                {
+                    this.curveTo(curves[i], curves[i + 1], curves[i + 2],
+                        curves[i + 3], curves[i + 4], curves[i + 5]);
+                }
+            }
+            
+            this.lastX = x;
+            this.lastY = y;
+        }
+    };
+        
+    RoughCanvas.prototype.rect = function(x, y, w, h)
+    {
+        if (this.passThrough)
+        {
+            this.originalRect.apply(this.canvas, arguments);
+        }
+        else
+        {
+            this.path = [];
+            this.nextShape = this.rc.generator.rectangle(x, y, w, h, this.getStyle(true, true));
+        }
+    };
+
+    RoughCanvas.prototype.ellipse = function(x, y, w, h)
+    {
+        if (this.passThrough)
+        {
+            this.originalEllipse.apply(this.canvas, arguments);
+        }
+        else
+        {
+            this.path = [];
+            this.nextShape = this.rc.generator.ellipse(x + w / 2, y + h / 2, w, h, this.getStyle(true, true));
+        }
+    };
+        
+    RoughCanvas.prototype.roundrect = function(x, y, w, h, dx, dy)
+    {
+        if (this.passThrough)
+        {
+            this.originalRoundrect.apply(this.canvas, arguments);
+        }
+        else
+        {
+            this.begin();
+            this.moveTo(x + dx, y);
+            this.lineTo(x + w - dx, y);
+            this.quadTo(x + w, y, x + w, y + dy);
+            this.lineTo(x + w, y + h - dy);
+            this.quadTo(x + w, y + h, x + w - dx, y + h);
+            this.lineTo(x + dx, y + h);
+            this.quadTo(x, y + h, x, y + h - dy);
+            this.lineTo(x, y + dy);
+            this.quadTo(x, y, x + dx, y);
+        }
+    };
+
+    RoughCanvas.prototype.drawPath = function(style)
+    {
+        if (this.path.length > 0)
+        {
+            this.passThrough = true;
+            try
+            {
+                this.rc.path(this.path.join(' '), style);
+            }
+            catch (e)
+            {
+                // ignore
+            }
+            this.passThrough = false;
+        }
+        else if (this.nextShape != null)
+        {
+            for (var key in style)
+            {
+                this.nextShape.options[key] = style[key];
+            }
+            
+            if (style['stroke'] == null)
+            {
+                delete this.nextShape.options['stroke'];
+            }
+            
+            if (!style.filled)
+            {
+                delete this.nextShape.options['fill'];
+            }
+
+            this.passThrough = true;
+            this.rc.draw(this.nextShape);
+            this.passThrough = false;
+        }	
+    };
+    
+    RoughCanvas.prototype.stroke = function()
+    {
+        if (this.passThrough)
+        {
+            this.originalStroke.apply(this.canvas, arguments);
+        }
+        else
+        {
+            this.drawPath(this.getStyle(true, false));
+        }
+    };
+    
+    RoughCanvas.prototype.fill = function()
+    {
+        if (this.passThrough)
+        {
+            this.originalFill.apply(this.canvas, arguments);
+        }
+        else
+        {
+            this.drawPath(this.getStyle(false, true));
+        }
+    };
+    
+    RoughCanvas.prototype.fillAndStroke = function()
+    {
+        if (this.passThrough)
+        {
+            this.originalFillAndStroke.apply(this.canvas, arguments);
+        }
+        else
+        {
+            this.drawPath(this.getStyle(true, true));
+        }
+    };
+    
+    RoughCanvas.prototype.destroy = function()
+    {
+         this.canvas.lineTo = this.originalLineTo;
+         this.canvas.moveTo = this.originalMoveTo;
+         this.canvas.close = this.originalClose;
+         this.canvas.quadTo = this.originalQuadTo;
+         this.canvas.curveTo = this.originalCurveTo;
+         this.canvas.arcTo = this.originalArcTo;
+         this.canvas.close = this.originalClose;
+         this.canvas.fill = this.originalFill;
+         this.canvas.stroke = this.originalStroke;
+         this.canvas.fillAndStroke = this.originalFillAndStroke;
+         this.canvas.begin = this.originalBegin;
+         this.canvas.end = this.originalEnd;
+         this.canvas.rect = this.originalRect;
+         this.canvas.ellipse = this.originalEllipse;
+         this.canvas.roundrect = this.originalRoundrect;
+    };
+            
+    // Returns a new HandJiggle canvas
+    mxShape.prototype.createRoughCanvas = function(c)
+    {
+        return new RoughCanvas(c, Editor.createRoughCanvas(c), this);	
+    };
+        
+    // Overrides to include sketch style
+    var shapeCreateHandJiggle = mxShape.prototype.createHandJiggle;
+    mxShape.prototype.createHandJiggle = function(c)
+    {
+        if (!this.outline && this.style != null && mxUtils.getValue(this.style,
+            'sketch', (urlParams['rough'] == '1') ?'1' : '0') != '0')
+        {
+            if (mxUtils.getValue(this.style, 'sketchStyle', 'rough') == 'comic')
+            {
+                return this.createComicCanvas(c);
+            }
+            else
+            {
+                return this.createRoughCanvas(c);	
+            }
+        }
+        else
+        {
+            return shapeCreateHandJiggle.apply(this, arguments);
+        }
+    };
+    
+    // Overrides for event handling on transparent background for sketch style
+    var shapePaint = mxShape.prototype.paint;
+    mxShape.prototype.paint = function(c)
+    {
+        var addTolerance = c.addTolerance;
+        var events = true;
+        
+        if (this.style != null)
+        {
+            events = mxUtils.getValue(this.style, mxConstants.STYLE_POINTER_EVENTS, '1') == '1';
+        }
+        
+        if (c.handJiggle != null && c.handJiggle.constructor == RoughCanvas && !this.outline)
+        {
+            // Save needed for possible transforms applied during paint
+            c.save();
+            var fill = this.fill;
+            var stroke = this.stroke;
+            this.fill = null;
+            this.stroke = null;
+            
+            var configurePointerEvents = this.configurePointerEvents;
+            
+            // Ignores color changes during paint
+            var setStrokeColor = c.setStrokeColor;
+            
+            c.setStrokeColor = function()
+            {
+                // ignore
+            };
+    
+            var setFillColor = c.setFillColor;
+            
+            c.setFillColor = function()
+            {
+                // ignore
+            };
+            
+            // Adds stroke tolerance for plain rendering if filled
+            if (!events && fill != null)
+            {
+                this.configurePointerEvents = function()
+                {
+                    // ignore
+                };
+            }
+            
+            c.handJiggle.passThrough = true;
+
+            shapePaint.apply(this, arguments);
+
+            c.handJiggle.passThrough = false;
+            c.setFillColor = setFillColor;
+            c.setStrokeColor = setStrokeColor;
+            this.configurePointerEvents = configurePointerEvents;
+            this.stroke = stroke;
+            this.fill = fill;
+            c.restore();
+            
+            // Bypasses stroke tolerance for sketched rendering if filled
+            if (events && fill != null)
+            {
+                c.addTolerance = function()
+                {
+                    // ignore	
+                };
+            }
+        }
+        
+        shapePaint.apply(this, arguments);
+        c.addTolerance = addTolerance;
+    };
+
+    // Overrides glass effect to disable sketch style
+    var shapePaintGlassEffect = mxShape.prototype.paintGlassEffect;
+    mxShape.prototype.paintGlassEffect = function(c, x, y, w, h, arc)
+    {
+        if (c.handJiggle != null && c.handJiggle.constructor == RoughCanvas)
+        {
+            c.handJiggle.passThrough = true;
+            shapePaintGlassEffect.apply(this, arguments);
+            c.handJiggle.passThrough = false;
+        }
+        else
+        {
+            shapePaintGlassEffect.apply(this, arguments);
+        }
+    };
+})();
+

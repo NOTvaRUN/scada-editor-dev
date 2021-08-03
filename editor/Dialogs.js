@@ -993,7 +993,7 @@ var LinkDialog = function(b, c, g, n) {
             mxEvent.addMouseWheelListener(function(b, d) {
                 var c = !1;
                 for (b = mxEvent.getSource(b); null != b;) {
-                    if (b == a.outline.view.canvas.ownerSVGElement) {
+                    if (a&& a.outline && b == a.outline.view.canvas.ownerSVGElement) {
                         c = !0;
                         break
                     }

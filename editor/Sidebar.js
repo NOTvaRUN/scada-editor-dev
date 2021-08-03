@@ -160,6 +160,7 @@ function Sidebar(a, c) {
     this.container = c;
     this.palettes = {};
     this.taglist = {};
+    this.imageSearch = {};
     this.showTooltips = !0;
     this.graph = a.createTemporaryGraph(this.editorUi.editor.graph.getStylesheet());
     this.graph.cellRenderer.minSvgStrokeWidth = this.minThumbStrokeWidth;
@@ -335,70 +336,187 @@ Sidebar.prototype.setCurrentSearchEntryLibrary = function(a, c) {
         lib: c
     } : null
 };
-Sidebar.prototype.addEntry = function(a, c) {
-    if (null != this.taglist && null != a && 0 < a.length) {
-        null != this.currentSearchEntryLibrary && (c.parentLibraries = [this.currentSearchEntryLibrary]);
-        a = a.toLowerCase().replace(/[\/,\(\)]/g, " ").split(" ");
-        for (var d = [], b = {}, g = mxUtils.bind(this, function(a) {
-                if (null != a && 1 < a.length) {
-                    var b = this.taglist[a];
-                    "object" !== typeof b && (b = {
-                        entries: [],
-                        dict: new mxDictionary
-                    }, this.taglist[a] = b);
-                    null == b.dict.get(c) && (b.dict.put(c, c), b.entries.push(c))
-                }
-            }), f = 0; f < a.length; f++) {
-            g(a[f]);
-            null == b[a[f]] &&
-                (b[a[f]] = !0, d.push(a[f]));
-            var h = a[f].replace(/\.*\d*$/, "");
-            h != a[f] && null == b[h] && (b[h] = !0, d.push(h))
+
+// Sidebar.prototype.addEntry = function (tags, fn) {
+// 	if (this.taglist != null && tags != null && tags.length > 0) {
+// 		// Replaces special characters
+// 		var tmp = tags.toLowerCase().replace(/[\/\,\(\)]/g, ' ').split(' ');
+
+// 		var doAddEntry = mxUtils.bind(this, function (tag) {
+// 			if (tag != null && tag.length > 1) {
+// 				var entry = this.taglist[tag];
+
+// 				if (typeof entry !== 'object') {
+// 					entry = { entries: [], dict: new mxDictionary() };
+// 					this.taglist[tag] = entry;
+// 				}
+                
+// 				// Ignores duplicates
+// 				if (entry.dict.get(fn) == null) {
+// 					entry.dict.put(fn, fn);
+// 					entry.entries.push(fn);
+// 				}
+// 			}
+// 		});
+// 		for (var i = 0; i < tmp.length; i++) {
+// 			doAddEntry(tmp[i]);
+
+// 			// Adds additional entry with removed trailing numbers
+// 			var normalized = tmp[i].replace(/\.*\d*$/, '');
+
+// 			if (normalized != tmp[i]) {
+// 				doAddEntry(normalized);
+// 			}
+// 		}
+// 	}
+// 	return fn;
+// };
+
+/**
+ * Hides the current tooltip.
+ */
+ Sidebar.prototype.setCurrentSearchEntryLibrary = function(id, lib)
+ {
+     this.currentSearchEntryLibrary = (id != null) ? {id: id, lib: lib} : null;
+ };
+ 
+ /**
+  * Hides the current tooltip.
+  */
+ Sidebar.prototype.addEntry = function(tags, fn)
+ {
+     if (this.taglist != null && tags != null && tags.length > 0)
+     {
+         if (this.currentSearchEntryLibrary != null)
+         {
+             fn.parentLibraries = [this.currentSearchEntryLibrary];
+         }
+         
+         // Replaces special characters
+         var tmp = tags.toLowerCase().replace(/[\/\,\(\)]/g, ' ').split(' ');
+         var tagList = [];
+         var hash = {};
+ 
+         // Finds unique tags
+         for (var i = 0; i < tmp.length; i++)
+         {
+             if (hash[tmp[i]] == null)
+             {
+                 hash[tmp[i]] = true;
+                 tagList.push(tmp[i]);
+             }
+             
+             // Adds additional entry with removed trailing numbers
+             var normalized = tmp[i].replace(/\.*\d*$/, '');
+             
+             if (normalized != tmp[i])
+             {
+                 if (hash[normalized] == null)
+                 {
+                     hash[normalized] = true;
+                     tagList.push(normalized);
+                 }
+             }
+         }
+         
+         for (var i = 0; i < tagList.length; i++)
+         {
+             this.addEntryForTag(tagList[i], fn);
+         }
+     }
+ 
+     return fn;
+ };
+
+ Sidebar.prototype.addEntryForTag = function(tag, fn)
+{
+	if (tag != null && tag.length > 1)
+	{
+		var entry = this.taglist[tag];
+		mxDictionary.prototype.clear();
+		if (typeof entry !== 'object')
+		{
+			entry = {entries: [], dict:new mxDictionary()};
+			this.taglist[tag] = entry;
+		}
+		// mxDictionary.prototype.clear();
+        if (entry.dict.get(fn) == null) {
+            entry.dict.put(fn, fn);
+            entry.entries.push(fn);
         }
-        for (f = 0; f < d.length; f++) this.addEntryForTag(d[f], c)
-    }
-    return c
+
+	}
 };
-Sidebar.prototype.addEntryForTag = function(a, c) {
-    if (null != a && 1 < a.length) {
-        var d = this.taglist[a];
-        "object" !== typeof d && (d = {
-            entries: []
-        }, this.taglist[a] = d);
-        d.entries.push(c)
-    }
+
+Sidebar.prototype.searchEntries = function (searchTerms, count, page, success, error) {
+	if (this.taglist != null && searchTerms != null) {
+		var tmp = searchTerms.toLowerCase().split(' ');
+		var dict = new mxDictionary();
+		var max = (page + 1) * count;
+		var results = [];
+		var index = 0;
+		var map = {}
+		var arr = []
+		for (var i = 0; i < tmp.length; i++) {
+			if (tmp[i].length > 0) {
+				var requiredObj = [];
+				for (const property in this.taglist) {
+					if(property.includes(tmp[i])){
+						requiredObj.push(this.taglist[property]);
+					}
+				  }
+				  for(var k=0;k<requiredObj.length;k++){
+					  var mappings = Object.keys(requiredObj[k].dict.map);
+					  for(var m = 0;m<mappings.length;m++){
+						  map[mappings[m]] = requiredObj[k].dict.map[mappings[m]]
+					  }
+					  for(var e =0;e<requiredObj[k].entries.length;e++){
+						if(arr.indexOf(requiredObj[k].entries[e]) === -1) {
+							arr.push(requiredObj[k].entries[e]);
+						}
+					  }
+				  }
+                var combinedObject = {
+					dict: map,
+					entries: arr
+				}
+				var entry = combinedObject;
+				var tmpDict = new mxDictionary();
+				if (entry != null) {
+					var arr = entry.entries;
+
+					results = [];
+					for (var j = 0; j < arr.length; j++) {
+						var entry = arr[j];
+
+						// NOTE Array does not contain duplicates
+						if ((index == 0) == (dict.get(entry) == null)) {
+							tmpDict.put(entry, entry);
+							results.push(entry);
+							if (i == tmp.length - 1 && results.length == max) {
+								success(results.slice(page * count, max), max, true, tmp);
+								return;
+							}
+						}
+					}
+				}
+				else {
+					results = [];
+				}
+
+				dict = tmpDict;
+				index++;
+			}
+		}
+
+		var len = results.length;
+		success(results.slice(page * count, (page + 1) * count), len, false, tmp);
+	}
+	else {
+		success([], null, null, tmp);
+	}
 };
-Sidebar.prototype.searchEntries = function(a, c, d, b, g) {
-    if (null != this.taglist && null != a) {
-        var f = a.toLowerCase().split(" ");
-        a = new mxDictionary;
-        g = (d + 1) * c;
-        for (var h = [], e = 0, k = {}, l = [], m = 0; m < f.length; m++)
-            if (0 < f[m].length) {
-                h = [];
-                for (var u in this.taglist) u.includes(f[m]) && h.push(this.taglist[u]);
-                for (var q = 0; q < h.length; q++)
-                    if (h[q] && h[q].dict) {
-                        for (var t = Object.keys(h[q].dict.map), p = 0; p < t.length; p++) k[t[p]] = h[q].dict.map[t[p]];
-                        for (t = 0; t < h[q].entries.length; t++) - 1 === l.indexOf(h[q].entries[t]) && l.push(h[q].entries[t])
-                    } q = {
-                    dict: k,
-                    entries: l
-                };
-                t = new mxDictionary;
-                if (null != q)
-                    for (l = q.entries, h = [], p = 0; p < l.length; p++) {
-                        if (q = l[p], 0 == e == (null == a.get(q)) && (t.put(q, q), h.push(q), m == f.length - 1 && h.length == g)) {
-                            b(h.slice(d * c, g), g, !0, f);
-                            return
-                        }
-                    } else h = [];
-                a = t;
-                e++
-            } u = h.length;
-        b(h.slice(d * c, (d + 1) * c), u, !1, f)
-    } else b([], null, null, f)
-};
+
 Sidebar.prototype.filterTags = function(a) {
     if (null != a) {
         a = a.split(" ");
@@ -553,14 +671,33 @@ Sidebar.prototype.insertSearchHint = function(a, c, d, b, g, f, h, e) {
 };
 Sidebar.prototype.addGeneralPalette = function(a) {
     this.setCurrentSearchEntryLibrary("general", "general");
-    var c = [this.createVertexTemplateEntry("rounded=0;whiteSpace=wrap;html=1;", 120, 60, "", "Rectangle", null, null, "rect rectangle box"), this.createVertexTemplateEntry("rounded=1;whiteSpace=wrap;html=1;", 120, 60, "", "Rounded Rectangle", null, null, "rounded rect rectangle box"), this.createVertexTemplateEntry("text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;",
-            40, 20, "Text", "Text", null, null, "text textbox textarea label"), this.createVertexTemplateEntry("text;html=1;strokeColor=none;fillColor=none;spacing=5;spacingTop=-20;whiteSpace=wrap;overflow=hidden;rounded=0;", 190, 120, "<h1>Heading</h1><p>Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>", "Textbox", null, null, "text textbox textarea"), this.createVertexTemplateEntry("ellipse;whiteSpace=wrap;html=1;", 120, 80, "", "Ellipse", null, null,
-            "oval ellipse state"), this.createVertexTemplateEntry("whiteSpace=wrap;html=1;aspect=fixed;", 80, 80, "", "Square", null, null, "square"), this.createVertexTemplateEntry("ellipse;whiteSpace=wrap;html=1;aspect=fixed;", 80, 80, "", "Circle", null, null, "circle"), this.createVertexTemplateEntry("shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;", 120, 60, "", "Process", null, null, "process task"), this.createVertexTemplateEntry("rhombus;whiteSpace=wrap;html=1;", 80, 80, "", "Diamond", null, null, "diamond rhombus if condition decision conditional question test"),
-        this.createVertexTemplateEntry("shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;", 120, 60, "", "Parallelogram"), this.createVertexTemplateEntry("shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;", 120, 80, "", "Hexagon", null, null, "hexagon preparation"), this.createVertexTemplateEntry("triangle;whiteSpace=wrap;html=1;", 60, 80, "", "Triangle", null, null, "triangle logic inverter buffer"), this.createVertexTemplateEntry("shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;",
-            60, 80, "", "Cylinder", null, null, "cylinder data database"), this.createVertexTemplateEntry("ellipse;shape=cloud;whiteSpace=wrap;html=1;", 120, 80, "", "Cloud", null, null, "cloud network"), this.createVertexTemplateEntry("shape=document;whiteSpace=wrap;html=1;boundedLbl=1;", 120, 80, "", "Document"), this.createVertexTemplateEntry("shape=internalStorage;whiteSpace=wrap;html=1;backgroundOutline=1;", 80, 80, "", "Internal Storage"), this.createVertexTemplateEntry("shape=cube;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;darkOpacity=0.05;darkOpacity2=0.1;",
-            120, 80, "", "Cube"), this.createVertexTemplateEntry("shape=step;perimeter=stepPerimeter;whiteSpace=wrap;html=1;fixedSize=1;", 120, 80, "", "Step"), this.createVertexTemplateEntry("shape=trapezoid;perimeter=trapezoidPerimeter;whiteSpace=wrap;html=1;fixedSize=1;", 120, 60, "", "Trapezoid"), this.createVertexTemplateEntry("shape=tape;whiteSpace=wrap;html=1;", 120, 100, "", "Tape"), this.createVertexTemplateEntry("shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;", 80, 100, "", "Note"), this.createVertexTemplateEntry("shape=card;whiteSpace=wrap;html=1;",
-            80, 100, "", "Card"), this.createVertexTemplateEntry("shape=callout;whiteSpace=wrap;html=1;perimeter=calloutPerimeter;", 120, 80, "", "Callout", null, null, "bubble chat thought speech message"), this.createVertexTemplateEntry("shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;", 30, 60, "Actor", "Actor", !1, null, "user person human stickman"), this.createVertexTemplateEntry("shape=xor;whiteSpace=wrap;html=1;", 60, 80, "", "Or", null, null, "logic or"), this.createVertexTemplateEntry("shape=or;whiteSpace=wrap;html=1;",
-            60, 80, "", "And", null, null, "logic and"), this.createVertexTemplateEntry("shape=dataStorage;whiteSpace=wrap;html=1;fixedSize=1;", 100, 80, "", "Data Storage"), this.addEntry("curve", mxUtils.bind(this, function() {
+    var c = [this.createVertexTemplateEntry("rounded=0;whiteSpace=wrap;html=1;", 120, 60, "", "Rectangle", null, null, "rect rectangle box test"), 
+            this.createVertexTemplateEntry("rounded=1;whiteSpace=wrap;html=1;", 120, 60, "", "Rounded Rectangle", null, null, "rounded rect rectangle box test"),
+            this.createVertexTemplateEntry("text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;", 40, 20, "Text", "Text", null, null, "text textbox textarea label test"), 
+            this.createVertexTemplateEntry("text;html=1;strokeColor=none;fillColor=none;spacing=5;spacingTop=-20;whiteSpace=wrap;overflow=hidden;rounded=0;", 190, 120, "<h1>Heading</h1><p>Lorem ipsum dolor sit amet, consectetur adipisicing elit, sed do eiusmod tempor incididunt ut labore et dolore magna aliqua.</p>", "Textbox", null, null, "text textbox textarea test"), 
+            this.createVertexTemplateEntry("ellipse;whiteSpace=wrap;html=1;", 120, 80, "", "Ellipse", null, null, "oval ellipse state test"), 
+            this.createVertexTemplateEntry("whiteSpace=wrap;html=1;aspect=fixed;", 80, 80, "", "Square", null, null, "square test"), 
+            this.createVertexTemplateEntry("ellipse;whiteSpace=wrap;html=1;aspect=fixed;", 80, 80, "", "Circle", null, null, "circle test"), 
+            this.createVertexTemplateEntry("shape=process;whiteSpace=wrap;html=1;backgroundOutline=1;", 120, 60, "", "Process", null, null, "process task test"), 
+            this.createVertexTemplateEntry("rhombus;whiteSpace=wrap;html=1;", 80, 80, "", "Diamond", null, null, "diamond rhombus if condition decision conditional question test"),
+            this.createVertexTemplateEntry("shape=parallelogram;perimeter=parallelogramPerimeter;whiteSpace=wrap;html=1;fixedSize=1;", 120, 60, "", "Parallelogram test"), 
+            this.createVertexTemplateEntry("shape=hexagon;perimeter=hexagonPerimeter2;whiteSpace=wrap;html=1;fixedSize=1;", 120, 80, "", "Hexagon", null, null, "hexagon preparation test"), 
+            this.createVertexTemplateEntry("triangle;whiteSpace=wrap;html=1;", 60, 80, "", "Triangle", null, null, "triangle logic inverter buffer test"), 
+            this.createVertexTemplateEntry("shape=cylinder3;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;size=15;", 60, 80, "", "Cylinder", null, null, "cylinder data database test"), 
+            this.createVertexTemplateEntry("ellipse;shape=cloud;whiteSpace=wrap;html=1;", 120, 80, "", "Cloud", null, null, "cloud network test"), 
+            this.createVertexTemplateEntry("shape=document;whiteSpace=wrap;html=1;boundedLbl=1;", 120, 80, "", "Document test"), 
+            this.createVertexTemplateEntry("shape=internalStorage;whiteSpace=wrap;html=1;backgroundOutline=1;", 80, 80, "", "Internal Storage test"), 
+            this.createVertexTemplateEntry("shape=cube;whiteSpace=wrap;html=1;boundedLbl=1;backgroundOutline=1;darkOpacity=0.05;darkOpacity2=0.1;", 120, 80, "", "Cube test"), 
+            this.createVertexTemplateEntry("shape=step;perimeter=stepPerimeter;whiteSpace=wrap;html=1;fixedSize=1;", 120, 80, "", "Step test"), 
+            this.createVertexTemplateEntry("shape=trapezoid;perimeter=trapezoidPerimeter;whiteSpace=wrap;html=1;fixedSize=1;", 120, 60, "", "Trapezoid test"), 
+            this.createVertexTemplateEntry("shape=tape;whiteSpace=wrap;html=1;", 120, 100, "", "Tape test"), 
+            this.createVertexTemplateEntry("shape=note;whiteSpace=wrap;html=1;backgroundOutline=1;darkOpacity=0.05;", 80, 100, "", "Note test"), 
+            this.createVertexTemplateEntry("shape=card;whiteSpace=wrap;html=1;", 80, 100, "", "Card test"), 
+            this.createVertexTemplateEntry("shape=callout;whiteSpace=wrap;html=1;perimeter=calloutPerimeter;", 120, 80, "", "Callout", null, null, "bubble chat thought speech message test"), 
+            this.createVertexTemplateEntry("shape=umlActor;verticalLabelPosition=bottom;verticalAlign=top;html=1;outlineConnect=0;", 30, 60, "Actor", "Actor", !1, null, "user person human stickman test"), 
+            this.createVertexTemplateEntry("shape=xor;whiteSpace=wrap;html=1;", 60, 80, "", "Or", null, null, "logic or test"), 
+            this.createVertexTemplateEntry("shape=or;whiteSpace=wrap;html=1;", 60, 80, "", "And", null, null, "logic and test"), 
+            this.createVertexTemplateEntry("shape=dataStorage;whiteSpace=wrap;html=1;fixedSize=1;", 100, 80, "", "Data Storage test"), this.addEntry("curve", mxUtils.bind(this, function() {
             var a = new mxCell("", new mxGeometry(0, 0, 50, 50), "curved=1;endArrow=classic;html=1;");
             a.geometry.setTerminalPoint(new mxPoint(0, 50), !0);
             a.geometry.setTerminalPoint(new mxPoint(50, 0), !1);

@@ -42,4 +42,7 @@ module.exports = {
 	mxCellRenderer,
 	mxConnectionHandler,
 	mxClipboard,
+	mxDictionary,
+	LayersWindow,
+	FilenameDialog,
 }

@@ -337,7 +337,7 @@ function Dialog(a, b, c, f, p, g, d, e, m, k, h) {
     v.appendChild(b);
     document.body.appendChild(v);
     !e && b.clientHeight > v.clientHeight - 64 && (b.style.overflowY = "auto");
-    if (g && (g = document.createElement("img"), g.setAttribute("src", Dialog.prototype.closeImage), g.setAttribute("title", mxResources.get("close")), g.className = "geDialogClose", g.style.top = r + 14 + "px", g.style.left = q + c + 38 - 0 + "px", g.style.zIndex = this.zIndex, mxEvent.addListener(g, "click", mxUtils.bind(this, function() {
+    if (g && (g = document.createElement("img"), g.setAttribute("src", Dialog.prototype.closeImage), g.setAttribute("title", mxResources.get("close")), g.className = "geDialogClose", g.style.top = r + 14 + "px", g.style.left = q + c + "px", g.style.zIndex = this.zIndex, mxEvent.addListener(g, "click", mxUtils.bind(this, function() {
             a.hideDialog(!0)
         })), document.body.appendChild(g), this.dialogImg = g, !h)) {
         var w = !1;
